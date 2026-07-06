@@ -1,0 +1,62 @@
+import { test, expect, type Page } from '@playwright/test';
+
+// brief pause after each test so a slowed-down run is easy to observe (skipped when SLOWMO unset)
+test.afterEach(async ({ page }) => {
+  if (process.env.SLOWMO) {
+    await page.waitForTimeout(2000);
+  }
+});
+
+// Playwright's slowMo launch option (set via SLOWMO, see playwright.config.ts) only delays
+// real browser input actions (click, fill, ...) -- it has no effect on page.request.*
+// calls, since those go straight over HTTP without touching the browser at all. Gated the
+// same way so headless/CI runs stay fast.
+const pause = (page: Page) => process.env.SLOWMO ? page.waitForTimeout(1000) : Promise.resolve();
+
+test('front page loads, shows seeded entries, and records a journal entry', async ({ page }) => {
+  await page.goto('/');
+
+  // app shell is up (mock auth renders the signed-in dashboard, not the marketing page)
+  await expect(page).toHaveTitle(/MotoGPT/);
+  await expect(page.getByText('Charts', { exact: true })).toBeVisible();
+
+  // each chart (DailyGauge, HourlyPatternChart, DailySummaryChart) mounts an echarts
+  // <canvas> inside a .Chart div
+  const charts = page.locator('.Chart canvas');
+  await expect(charts.first()).toBeVisible({ timeout: 15_000 });
+  expect(await charts.count()).toBeGreaterThanOrEqual(3);
+  await pause(page);
+
+  // the Entries section is backed by services/stores/memory.ts's seeded Log history for
+  // the impersonated smoke-test user
+  await expect(page.getByText('Chain cleaned and lubed after the weekend ride.')).toBeVisible();
+  await pause(page);
+
+  // record a journal entry through the real dialog flow, not a direct API call
+  const entryText = `smoke test entry ${Date.now()}`;
+  await page.getByRole('button', { name: 'Journal Entry' }).click();
+  // getByRole (not getByLabel) -- the dialog's own accessible name "Journal Entry"
+  // substring-matches "Entry" too
+  await page.getByRole('textbox', { name: 'Entry' }).fill(entryText);
+  await pause(page);
+
+  const addResponsePromise = page.waitForResponse((res) =>
+    res.url().includes('/api/logs') && res.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Save' }).click();
+  const { log } = await (await addResponsePromise).json();
+  expect(log?.type).toBe('journal');
+  expect(log?.entry).toBe(entryText);
+  await pause(page);
+
+  // wait for the dialog to finish closing first -- until it unmounts, its textarea also
+  // matches the entry text and getByText would fail on a strict-mode violation
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  // the new entry shows up in the dashboard's Entries section
+  await expect(page.getByText(entryText)).toBeVisible();
+  await pause(page);
+
+  // cleanup so repeated runs against the same long-lived in-memory store don't accumulate
+  // entries indefinitely
+  await page.request.delete(`/api/logs/${log.id}`);
+});
