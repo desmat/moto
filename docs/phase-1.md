@@ -4,6 +4,8 @@ Breakdown of [roadmap](./roadmap.md) Phase 1 into stories with acceptance criter
 
 Groundwork already in place: `openai` (v4) and `@vercel/blob` are already dependencies; `BLOB_READ_WRITE_TOKEN` is already a required env var.
 
+**Pre-step**: before any story, run [implementation-plans/phase-1-s0.md](./implementation-plans/phase-1-s0.md) — groundwork checks plus resolution of the flags raised in the plan review.
+
 ---
 
 ## S1 — OpenAI service layer (`services/ai.ts`)
@@ -103,3 +105,13 @@ The end-to-end slice: in the mileage-mode dialog, a photo of the odometer pre-fi
 | S6 Odometer OCR | S1, S4 | M |
 
 Deferred from Phase 1 (noted, not built): orphaned-attachment reaping, HEIC conversion edge cases, image resizing/thumbnails (blob URLs served as-is for now), multi-image OCR.
+
+## Final step — handover to Phase 2
+
+After the last story is implemented and verified (not before — the handover documents reality, not intent), write `docs/handovers/phase-1-to-phase-2.md`, addressed to the agent implementing [Phase 2](./phase-2.md). The Phase 2 stories and plans were written against *these plans*, so anything that landed differently is a landmine for that agent. Cover:
+
+- **What shipped, where, and the actual exported surfaces** Phase 2 builds on: `services/ai.ts` (the final `extractFromImage` signature, the `MODELS` const, how the `MOCKS` registry is keyed — S7/S10/S11/S13 all extend this file), the attachment upload call chain (`lib/upload.ts` → `/api/attachments/upload` → `/api/attachments`, the `moto/{userId}/` prefix rule and pathname idempotency), and the log-dialog attachment strip S11 reuses.
+- **Deviations from these plans**: renames, moved files, changed decisions, dropped or weakened acceptance criteria — and for each, which Phase 2 plan sections it invalidates (they cite S1–S6 files and patterns by name).
+- **Test/dev machinery**: mock knobs added (`AI_MOCK`, `BLOB_MOCK`), `playwright.config.ts` changes, memory-store seed changes (Phase 2's S11/S16-era work re-types these seeds), fixtures added under `test/fixtures/`, and anything flaky or order-dependent observed in the suite.
+- **Deferred/known-wart list as it actually stands** (orphaned attachments, HEIC, etc.), plus any new warts discovered during implementation.
+- **Env/deps**: new env vars and where they're documented, `.env.local` entries the next agent must have, prompt text locations and any tuning notes from the S6 manual pass.

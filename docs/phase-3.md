@@ -2,6 +2,8 @@
 
 Breakdown of [roadmap](./roadmap.md) Phase 3, continuing the numbering from [phase-2](./phase-2.md) (S7–S13). Assumes Phase 2 is done: `MaintenanceSchedule` exists per vehicle (S10), service logs carry structured `items` with canonical keys (S11), `vehicle.components` tracks current state (S12), and manual chunks are searchable (S9).
 
+**Pre-step**: before any story, run [implementation-plans/phase-3-s0.md](./implementation-plans/phase-3-s0.md) — verify the Phase 2 handover against the code and resolve the flags raised in the plan review.
+
 Ordering within the phase differs slightly from the roadmap: the **status engine (S14) and mileage projection (S15) come first** as pure service-layer work, because both dashboard surfaces (S16, S17) and the chat's tools (S18) consume them. Projection moved ahead of the roadmap's 3.4 slot so "next due" is time-aware from day one instead of retrofitted.
 
 ---
@@ -99,3 +101,13 @@ S14+S15 first (pure services, highly testable). S16/S17 are parallel consumers. 
 No new dependencies expected (SSE streaming via the `openai` SDK + a route handler; no chat-UI library — the existing dialog/Button/Textarea primitives suffice for v1).
 
 Deferred from Phase 3: `Chat` persistence entity + history, proactive daily brief (Phase 4 reminders build on S14/S15 directly), voice input in chat, schedule-item taxonomy reconciliation beyond key matching, surfacing the classifier's `scheduleKeys` for inline correction (JSON editor suffices for now).
+
+## Final step — handover to Phase 4
+
+After the last story is implemented and verified, write `docs/handovers/phase-3-to-phase-4.md`, addressed to the agent who will plan and implement [roadmap](./roadmap.md) Phase 4. Phase 4 has no phase doc or story breakdown yet, so this handover does double duty: it briefs the implementer *and* informs whoever writes `docs/phase-4.md`. Cover:
+
+- **The engine surfaces Phase 4 builds on**: `services/maintenance.ts` / `services/mileage.ts` exports and payload shapes as shipped (4.1 reminders are "S14 + S15 evaluated on a schedule"), the exported threshold consts, which parts are pure/client-safe vs. store-touching, and the `/api/maintenance` route contracts.
+- **What 4.2 charts need**: the structured cost data actually available on service logs (`items[].cost`, `totalCost`), and a reminder that the `counters` mechanism in `@desmat/redis-store` (AGENTS.md) is still unused — note anything learned about it, and that dashboard charts are still dummy data.
+- **What 4.4 search gets for free**: the embedding/search plumbing (`services/vector.ts`, `searchDocuments`) as shipped, its tenant-isolation invariant, and what it would take to index *logs* (only documents are embedded today).
+- **New-infrastructure warnings for 4.1**: this app has zero scheduled/background-work machinery — record what was considered and deferred (the S9 in-route `maxDuration` compromise, the no-queue decision) so reminders don't rediscover those constraints.
+- **The standing deviations/deferred ledger**: everything from the Phase 1–2 handovers still outstanding, plus Phase 3's own (chat persistence, classifier-correction UI, etc.), deviations from these plans, seed/mock state (including the S18 scripted assistant turn), and prompt locations + tuning notes for all four high-leverage prompts.

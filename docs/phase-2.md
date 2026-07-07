@@ -6,6 +6,8 @@ Decisions already made (recorded in the roadmap):
 - **Embeddings live in Upstash Vector.**
 - **Extracted service items are structured fields on `Log`** (the log stays "the thing that happened") **plus a current-state snapshot** ("what's on the bike now") — entity vs. vehicle sub-field resolved in S12 below.
 
+**Pre-step**: before any story, run [implementation-plans/phase-2-s0.md](./implementation-plans/phase-2-s0.md) — verify the Phase 1 handover against the code and resolve the flags raised in the plan review.
+
 One scoping call made here: **`Document` = big reference documents (manuals; later wiring diagrams, insurance papers) that get chunked and embedded. Receipts are *not* Documents** — a receipt's payload becomes structured fields on a `Log` (S11) with the photo as a plain attachment. Nothing about a 40-line receipt needs chunking/embedding, and the log itself is what search and the Phase 3 schedule matcher consume.
 
 ---
@@ -128,3 +130,14 @@ S7/S8 and S11 are independent tracks; S11+S12 (receipts → state) is the highes
 **New dependencies**: `@upstash/vector`, `unpdf`. **New env vars**: `UPSTASH_VECTOR_REST_URL`, `UPSTASH_VECTOR_REST_TOKEN` (server-only — not whitelisted in `next.config.mjs`).
 
 Deferred from Phase 2: background job queue for ingestion (in-route `maxDuration` for now), rebuild-components-from-logs admin task, multi-manual/versioned schedules per vehicle, canonical component taxonomy beyond extraction-time slugging, handwritten receipt quality, citation UI for chunk page numbers (metadata is captured; surfacing it is Phase 3 chat).
+
+## Final step — handover to Phase 3
+
+After the last story is implemented and verified, write `docs/handovers/phase-2-to-phase-3.md`, addressed to the agent implementing [Phase 3](./phase-3.md). Phase 3's engine (S14) and chat (S18) consume Phase 2's data model directly — this handover is what keeps them from re-deriving it. Cover:
+
+- **The contracts Phase 3 reads**: `MaintenanceSchedule`/`ScheduleItem` as actually shipped (S14 computes over it), how the one-confirmed-schedule-per-vehicle invariant is enforced and through which code path (`confirmSchedule` vs. routes — S14's test fixtures POST confirmed schedules and need to know the sanctioned way), `CANONICAL_COMPONENT_KEYS` location and final vocabulary, the structured `Log` fields (`items`/`mileage`/`vendor`/`totalCost`) and `saveLog`'s post-save block structure (mileage sync + monotonic rule + components update — S14 appends its classifier to this exact block), and `searchDocuments`' signature/result shape (S18's tool).
+- **Reusable UI pieces and their props**: `extracted-rows.tsx`, `service-log-dialog.tsx` (S16/S17 add `defaultItems`/`defaultVehicleId` to it), the review-then-confirm pattern conventions.
+- **Deviations from these plans**, each mapped to the Phase 3 plan sections it invalidates (S14–S18 cite Phase 2 files, seeds, and mocks by name).
+- **Seed/mock state**: exact memory-store seed contents after the S11 re-typing (S16's dashboard seed math is tuned against these numbers — include dates, mileages, and which seeded logs carry `items`/keys), the `AI_MOCK` mock registry entries and scripted behaviors (S13's interview script, classifier mocks), and any test-suite order/parallelism hazards observed.
+- **Prompts**: where the manual-extraction, receipt, and onboarding prompts live and what the real-data tuning passes learned (these are named the highest-leverage prompts — the notes matter more than the code).
+- **Env/deps**: `@upstash/vector`/`unpdf`, vector index provisioning steps as actually performed, new env vars.
