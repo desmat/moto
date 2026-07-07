@@ -185,7 +185,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={NavItems} />
       </SidebarContent>
       <SidebarFooter>
-        {/* SignedIn/SignedOut require a mounted ClerkProvider, which mock-auth mode skips entirely */}
+        {/* Show requires a mounted ClerkProvider, which mock-auth mode skips entirely */}
         {!isMockAuthEnabledClient() &&
           <Show when="signed-out">
             <SidebarMenu>
