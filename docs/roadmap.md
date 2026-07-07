@@ -61,6 +61,8 @@ By vehicle, type, date range, free text (and semantic search rides on the Phase 
 
 Fuel logs, recall lookups, warranty tracking, consumables/parts shopping lists, seasonal checklists, multi-vehicle dashboards, sold/retired lifecycle, CSV import, voice dictation. All good; none block the core loop, and several (voice entry, consumables) become much easier once the Phase 1–2 plumbing exists.
 
+Also optional (infrastructure, not a feature): migrating auth from Clerk to Firebase Auth for anonymous try-it accounts with in-place upgrade to signup — planned in [implementation-plans/optional-firebase-auth.md](./implementation-plans/optional-firebase-auth.md). If done at all, do it early: its account-merge fallback gets more expensive with every shipped phase.
+
 ## Cross-cutting decisions to settle before Phase 2
 
 - **(a) Embeddings storage**: lean is Upstash Vector — stays in the Upstash ecosystem. 
