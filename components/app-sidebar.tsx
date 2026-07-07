@@ -3,8 +3,8 @@
 import { Show, SignInButton, UserButton } from "@clerk/nextjs"
 import { DropdownMenu, DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu"
 import {
-  Bike,
   CircleUser,
+  Motorbike,
   NotebookText,
   Sparkles,
 } from "lucide-react"
@@ -27,7 +27,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useUser } from "@/hooks/use-user";
 import { isMockAuthEnabledClient, mockUser } from "@/lib/mock-auth";
 
-export const AppLogo = Bike;
+export const AppLogo = Motorbike;
 
 const data = {
   teams: [
@@ -43,7 +43,7 @@ export const NavItems = [
   {
     title: "Vehicles",
     url: "/vehicles",
-    icon: Bike,
+    icon: Motorbike,
   },
   {
     title: "Logs",

@@ -13,6 +13,13 @@ import SignedOutPage from './signed-out-page';
 export const metadata: Metadata = {
   title: "MotoGPT",
   description: "Track your motorcycle maintenance with AI-powered insights",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-icon.png",
+  },
 };
 
 function AppBody({ children }: { children: React.ReactNode }) {

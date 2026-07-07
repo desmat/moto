@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { SignInButton, SignUpButton, useUser } from '@clerk/nextjs';
 import {
-  Bike, CircleUser,
+  CircleUser,
   Gauge, Wrench, Cog,
+  Motorbike,
   NotebookText, NotebookPen, ScrollText,
   Sparkles, Bot, PartyPopper,
 } from "lucide-react";
@@ -14,7 +15,7 @@ import "./globals.css";
 import { cn } from '@/lib/utils';
 
 const Steps = [
-  { text: "Add your ride", icons: [Bike, Cog] },
+  { text: "Add your ride", icons: [Motorbike, Cog] },
   { text: "Log mileage and maintenance", icons: [Gauge, Wrench, ScrollText] },
   { text: "Journal rides, issues, work done", icons: [NotebookText, NotebookPen] },
   { text: "AI keeps track of what's due next", icons: [Bot, Sparkles, PartyPopper] },
@@ -89,7 +90,12 @@ export default function SignedOutPage() {
     <div className="min-h-screen px-4 sm:px-8 font-[family-name:var(--font-geist-sans)] flex flex-col">
       <header className="w-full pt-3 sm:pt-6 lg:pt-12">
         <div className="w-full flex sm:flex-row flex-col items-center justify-center sm:gap-2 gap-[0.1rem] text-lg">
-          <div><span className="font-bold text-xl">MotoGPT</span></div>
+          <div className="flex items-center gap-2">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-slate-900 text-white">
+              <Motorbike className="size-5" />
+            </span>
+            <span className="font-bold text-xl">MotoGPT</span>
+          </div>
           <div className="sm:block hidden"> - </div>
           <div className="font-semibold">AI-powered motorcycle maintenance tracking</div>
         </div>
@@ -122,13 +128,13 @@ export default function SignedOutPage() {
             <div>
               {!isLoaded &&
                 <Button disabled={true} size="lg">
-                  <Bike /> Get Started Now
+                  <Motorbike /> Get Started Now
                 </Button>
               }
               {isLoaded &&
                 <SignUpButton mode="modal">
                   <Button size="lg">
-                    <Bike />Get Started Now
+                    <Motorbike />Get Started Now
                   </Button>
                 </SignUpButton>
               }
