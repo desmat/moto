@@ -11,6 +11,12 @@ function gitInfo(format) {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // silences the workspace-root warning: without this, Turbopack walks up looking for
+  // lockfiles and picks up an unrelated one at /Users/desmat/yarn.lock, several directories
+  // above this project
+  turbopack: {
+    root: import.meta.dirname,
+  },
   env: {
     IMPERSONATE_USER_ID: process.env.IMPERSONATE_USER_ID,
     IMPERSONATE_USER_IS_ADMIMN: process.env.IMPERSONATE_USER_IS_ADMIMN,
