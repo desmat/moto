@@ -112,6 +112,27 @@ test('Tailwind theme utilities are actually compiled into the page', async ({ pa
   expect(borderRadius).not.toBe('0px');
 });
 
+test('desktop sidebar renders at its configured width', async ({ page }) => {
+  // Regression guard for the Tailwind v4 migration: v3's CSS-variable shorthand in
+  // arbitrary values (w-[--sidebar-width]) is silently ignored by v4 (the new syntax
+  // is w-(--sidebar-width)), which collapsed the sidebar and its layout spacer and
+  // slid the page content underneath the fixed sidebar on md+ viewports.
+  await page.goto('/');
+  await expect(page.getByText('Charts', { exact: true })).toBeVisible();
+
+  // the desktop (non-mobile) sidebar panel -- SIDEBAR_WIDTH in components/ui/sidebar.tsx
+  const sidebar = page.locator('[data-sidebar="sidebar"]');
+  const box = await sidebar.boundingBox();
+  // 12rem = 192px, minus the container's 1px border; when the regression hits, the
+  // width falls back to the widest nav item (~175px at these font metrics)
+  expect(box?.width).toBeGreaterThanOrEqual(190);
+  expect(box?.width).toBeLessThanOrEqual(192);
+
+  // and the main content starts to the right of it rather than underneath
+  const record = await page.getByText('Record', { exact: true }).boundingBox();
+  expect(record!.x).toBeGreaterThan(192);
+});
+
 test('a failed query surfaces a sonner toast', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByText('Charts', { exact: true })).toBeVisible();
