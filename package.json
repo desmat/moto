@@ -14,7 +14,7 @@
     "test:api": "playwright test test/api"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.36.5",
+    "@clerk/nextjs": "^7.5.13",
     "@desmat/redis-store": "^1.4.0",
     "@desmat/utils": "^1.1.0",
     "@radix-ui/react-avatar": "^1.1.11",
