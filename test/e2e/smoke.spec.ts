@@ -60,3 +60,17 @@ test('front page loads, shows seeded entries, and records a journal entry', asyn
   // entries indefinitely
   await page.request.delete(`/api/logs/${log.id}`);
 });
+
+test('a failed query surfaces a sonner toast', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByText('Charts', { exact: true })).toBeVisible();
+
+  // app/signed-in-page.tsx wires react-query's QueryCache onError straight to
+  // sonner's toast.error() -- a vehicle id that doesn't exist 404s and should
+  // surface a toast, not just a silent console error. React Query retries failed
+  // queries a few times with backoff before onError fires, so this needs a longer
+  // timeout than the default 5s.
+  await page.goto('/vehicles/does-not-exist');
+  await expect(page.locator('[data-sonner-toast]')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('[data-sonner-toast]')).toContainText('An error occured');
+});
