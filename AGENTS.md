@@ -16,6 +16,8 @@ This file provides guidance to coding agents working in this repository.
 
 Tests live under `test/`: `test/e2e` for browser-driven UI specs, `test/api` for HTTP-level API/integration specs. Playwright starts a dedicated Next.js server on port 3100, loads `.env.local`, and overrides auth with `NEXT_PUBLIC_MOCK_AUTH=true` plus the test user from `playwright.config.ts`. Install the browser with `npx playwright install chromium` before the first run. There is no unit-test runner configured.
 
+**Next 16 gotcha**: Next allows only one dev server per project directory — a second `next dev` refuses to start ("Another next dev server is already running"), *even on a different port*; the lock is per-directory, not per-port. In practice: `npm run test` fails at its webServer step whenever any dev server for this repo is already running (the usual `npm run dev`, or a throwaway one started for screenshots) — stop it first (the error message prints the PID to kill).
+
 ## Architecture
 
 MotoGPT is a Next.js 14 App Router app for tracking motorcycle maintenance (vehicles, mileage, maintenance/journal logs) with AI-generated service recommendations planned (`/insights` is currently a placeholder).
