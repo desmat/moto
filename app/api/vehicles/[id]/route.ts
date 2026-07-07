@@ -5,10 +5,11 @@ import { deleteVehicle, getVehicle, saveVehicle } from '@/services/vehicles';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const user = await currentUser();
-  console.log('app.api.vehicles.[id].GET', { params, user });
+  console.log('app.api.vehicles.[id].GET', { id, user });
 
   if (!user) {
     return NextResponse.json(
@@ -17,7 +18,7 @@ export async function GET(
     );
   }
 
-  const vehicle = await getVehicle(params.id);
+  const vehicle = await getVehicle(id);
 
   if (!vehicle) {
     return NextResponse.json(
@@ -38,10 +39,11 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const user = await currentUser();
-  console.log('app.api.vehicles.[id].PUT', { params, user });
+  console.log('app.api.vehicles.[id].PUT', { id, user });
 
   if (!user) {
     return NextResponse.json(
@@ -50,7 +52,7 @@ export async function PUT(
     );
   }
 
-  const existing = await getVehicle(params.id);
+  const existing = await getVehicle(id);
 
   if (!existing) {
     return NextResponse.json(
@@ -88,10 +90,11 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const user = await currentUser();
-  console.log('app.api.vehicles.[id].DELETE', { params, user });
+  console.log('app.api.vehicles.[id].DELETE', { id, user });
 
   if (!user) {
     return NextResponse.json(
@@ -100,7 +103,7 @@ export async function DELETE(
     );
   }
 
-  const existing = await getVehicle(params.id);
+  const existing = await getVehicle(id);
 
   if (!existing) {
     return NextResponse.json(
@@ -116,7 +119,7 @@ export async function DELETE(
     );
   }
 
-  const deleted = await deleteVehicle(params.id);
+  const deleted = await deleteVehicle(id);
 
   await trackEvent("vehicle-deleted", {
     userId: user.id,

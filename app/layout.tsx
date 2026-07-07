@@ -1,7 +1,6 @@
 import {
   ClerkProvider,
-  SignedIn,
-  SignedOut,
+  Show,
 } from '@clerk/nextjs'
 import { Analytics } from "@vercel/analytics/react"
 import type { Metadata } from "next";
@@ -19,15 +18,15 @@ export const metadata: Metadata = {
 function AppBody({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <SignedOut>
+      <Show when="signed-out">
         <SignedOutPage />
-      </SignedOut>
-      <SignedIn>
+      </Show>
+      <Show when="signed-in">
         <SignedInPage>
           {children}
         </SignedInPage>
         <Toaster />
-      </SignedIn>
+      </Show>
       <Analytics />
     </>
   );

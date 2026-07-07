@@ -35,7 +35,7 @@ function ChartNoSsr({
   style?: any
 }) {
   const [chart, setChart] = useState<any>()
-  const chartRef = useRef<any>();
+  const chartRef = useRef<any>(undefined);
   // console.log("components.charts.Chart", { chartRef });
 
   useResizeObserver(chartRef.current, () => chart && chart.resize());

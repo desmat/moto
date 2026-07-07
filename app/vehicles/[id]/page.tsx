@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { use, useState } from "react";
 import NotFound from "@/app/not-found";
 import JsonEditor from "@/components/json-editor";
 import { useVehicle } from "@/hooks/use-vehicle";
@@ -9,10 +9,10 @@ import { useVehicle } from "@/hooks/use-vehicle";
 export default function Page({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
   const router = useRouter();
-  const id = decodeURIComponent(params.id);
+  const id = decodeURIComponent(use(params).id);
   const { loaded, vehicles, save, delete: deleteVehicle } = useVehicle(id);
   const [saving, setSaving] = useState(false);
 

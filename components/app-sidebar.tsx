@@ -1,6 +1,6 @@
 "use client"
 
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs"
+import { Show, SignInButton, UserButton } from "@clerk/nextjs"
 import { DropdownMenu, DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu"
 import {
   Bike,
@@ -185,9 +185,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={NavItems} />
       </SidebarContent>
       <SidebarFooter>
-        {/* SignedIn/SignedOut require a mounted ClerkProvider, which mock-auth mode skips entirely */}
+        {/* Show requires a mounted ClerkProvider, which mock-auth mode skips entirely */}
         {!isMockAuthEnabledClient() &&
-          <SignedOut>
+          <Show when="signed-out">
             <SidebarMenu>
               <SidebarMenuItem>
                 <DropdownMenu>
@@ -215,13 +215,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </DropdownMenu>
               </SidebarMenuItem>
             </SidebarMenu>
-          </SignedOut>
+          </Show>
         }
         {isMockAuthEnabledClient()
           ? <UserMenu impersonatedUserId={impersonatedUserId} sidebar={sidebar} sidebarAnimating={sidebarAnimating} />
-          : <SignedIn>
+          : <Show when="signed-in">
             <UserMenu impersonatedUserId={impersonatedUserId} sidebar={sidebar} sidebarAnimating={sidebarAnimating} />
-          </SignedIn>
+          </Show>
         }
       </SidebarFooter>
       <SidebarRail />

@@ -5,10 +5,11 @@ import { currentUser } from '@/services/users'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const user = await currentUser();
-  console.log('app.api.logs.[id].GET', { params, user });
+  console.log('app.api.logs.[id].GET', { id, user });
 
   if (!user) {
     return NextResponse.json(
@@ -17,7 +18,7 @@ export async function GET(
     );
   }
 
-  const log = await getLog(params.id);
+  const log = await getLog(id);
 
   if (!log) {
     return NextResponse.json(
@@ -38,10 +39,11 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const user = await currentUser();
-  console.log('app.api.logs.[id].PUT', { params, user });
+  console.log('app.api.logs.[id].PUT', { id, user });
 
   if (!user) {
     return NextResponse.json(
@@ -50,7 +52,7 @@ export async function PUT(
     );
   }
 
-  const existing = await getLog(params.id);
+  const existing = await getLog(id);
 
   if (!existing) {
     return NextResponse.json(
@@ -90,10 +92,11 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const user = await currentUser();
-  console.log('app.api.logs.[id].DELETE', { params, user });
+  console.log('app.api.logs.[id].DELETE', { id, user });
 
   if (!user) {
     return NextResponse.json(
@@ -102,7 +105,7 @@ export async function DELETE(
     );
   }
 
-  const existing = await getLog(params.id);
+  const existing = await getLog(id);
 
   if (!existing) {
     return NextResponse.json(
@@ -118,7 +121,7 @@ export async function DELETE(
     );
   }
 
-  const deleted = await deleteLog(params.id);
+  const deleted = await deleteLog(id);
 
   await trackEvent("log-deleted", {
     userId: user.id,
