@@ -61,6 +61,24 @@ test('front page loads, shows seeded entries, and records a journal entry', asyn
   await page.request.delete(`/api/logs/${log.id}`);
 });
 
+test('Tailwind theme utilities are actually compiled into the page', async ({ page }) => {
+  // Regression guard for the Tailwind v4 migration (JS config -> CSS-first @theme in
+  // app/globals.css): if the @theme block's --color-* tokens ever stop generating
+  // utilities (or the @plugin "tailwindcss-animate" line stops loading), buttons would
+  // silently fall back to unstyled browser defaults -- a transparent background here
+  // would mean the CSS pipeline produced no styles at all, not just a wrong color.
+  await page.goto('/');
+  const button = page.getByRole('button', { name: 'Journal Entry' });
+  await expect(button).toBeVisible();
+
+  const backgroundColor = await button.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+  expect(backgroundColor).not.toBe('');
+
+  const borderRadius = await button.evaluate((el) => getComputedStyle(el).borderRadius);
+  expect(borderRadius).not.toBe('0px');
+});
+
 test('a failed query surfaces a sonner toast', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByText('Charts', { exact: true })).toBeVisible();
