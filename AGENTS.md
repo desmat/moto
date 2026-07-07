@@ -27,9 +27,9 @@ MotoGPT is a Next.js 14 App Router app for tracking motorcycle maintenance (vehi
 - `Vehicle` (`types/Vehicle.ts`) — belongs to a user via `userId`; `type`/`maker`/`model`/`year`/`mileage`/`modifications`.
 - `Log` (`types/Log.ts`) — belongs to a user (`userId`) and a vehicle (`vehicleId`); just `type`/`date` (YYYYMMDD)/`entry`. `type` is `"journal"`, `"mileage"`, or any user-entered custom string. Saving a `"mileage"` log also updates the owning vehicle's `mileage` field (`services/logs.ts`'s `saveLog()`), so the vehicle record always reflects the latest reading.
 
-**Auth**: Clerk. `middleware.ts` gates every route except `/`:
+**Auth**: Clerk. `proxy.ts` (Next.js 16's rename of the `middleware.ts` file convention — same default-export shape) gates every route except `/`:
 - `/api/admin*` is instead authorized via a static `x-api-key` header checked against `API_KEY` (no Clerk session), for server-to-server/admin calls (no such routes currently exist; the gate remains for when they do).
-- All other non-public routes require a Clerk session; on success the middleware calls `resolveUser()` (`services/users.ts`) to upsert the user record (keyed by internal short UUID, looked up by `providerId`), then lets the request through. Missing auth returns 403 JSON for API routes and redirects to `/` otherwise.
+- All other non-public routes require a Clerk session; on success the proxy calls `resolveUser()` (`services/users.ts`) to upsert the user record (keyed by internal short UUID, looked up by `providerId`), then lets the request through. Missing auth returns 403 JSON for API routes and redirects to `/` otherwise.
 - `IMPERSONATE_USER_ID` short-circuits `currentUser()` to that exact id (used directly as the internal user id, no provider mapping) for local/admin testing; mock-auth mode (`NEXT_PUBLIC_MOCK_AUTH=true`, see `lib/mock-auth.ts`) does the same with the mock identity.
 
 **Onboarding**: `app/signed-in-page-main.tsx` forces the add-a-vehicle dialog (`components/setup-vehicle-dialog.tsx`) whenever the signed-in user has zero vehicles; the same component doubles as the Vehicles page's "Add Vehicle" dialog.
@@ -65,4 +65,4 @@ Non-`NEXT_PUBLIC_`-prefixed vars read directly in client code (`hooks/use-user.t
 
 Set in `.env.local` (not committed): `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `API_KEY`, `KV_URL`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `KV_REST_API_READ_ONLY_TOKEN`, `BLOB_READ_WRITE_TOKEN`, and optionally `IMPERSONATE_USER_ID` / `IMPERSONATE_USER_IS_ADMIMN`.
 
-Also optional, for local dev/tests without a real Upstash instance: `STORE_TYPE=memory` swaps `createStore()` to an in-memory store (ignored when `NODE_ENV=production`), pre-populated with the small hard-coded fixture in `services/stores/memory.ts` (not loaded from a file, since `middleware.ts` runs in the Edge runtime, which has no `fs`). Writes made during the session are not persisted anywhere.
+Also optional, for local dev/tests without a real Upstash instance: `STORE_TYPE=memory` swaps `createStore()` to an in-memory store (ignored when `NODE_ENV=production`), pre-populated with the small hard-coded fixture in `services/stores/memory.ts` (not loaded from a file, since `proxy.ts` runs in the Edge runtime, which has no `fs`). Writes made during the session are not persisted anywhere.
