@@ -77,7 +77,9 @@ function buildLogSeeds(): any[] {
     mk(0, "journal", "Chain cleaned and lubed after the weekend ride.", "1"),
     mk(1, "mileage", "18250", "2"),
     mk(3, "oil change", "Full synthetic 10W-30, new filter.", "3"),
+    mk(5, "chain adjustment", "Tightened to 35mm slack, cleaned and lubed.", "6"),
     mk(8, "journal", "Front brake lever feels spongy, bleed brakes soon.", "4"),
+    mk(10, "new tires", "Michelin Anakee Adventure front and rear.", "7"),
     mk(12, "mileage", "17980", "5"),
   ];
 }

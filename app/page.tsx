@@ -44,6 +44,15 @@ export default function Page() {
   // default the record dialogs to the most recently logged vehicle
   const defaultVehicleId = (latestLogs && latestLogs[0] as any)?.vehicleId;
 
+  // the most recently used custom log types, as quick-record shortcuts under the
+  // main Record buttons (latestLogs is already sorted newest-first, so keeping each
+  // type's first occurrence keeps its most recent position)
+  const recentCustomTypes = (latestLogs || [])
+    .map((log: any) => log.type as string)
+    .filter((type: string, index: number, types: string[]) =>
+      type != LogTypeJournal && type != LogTypeMileage && types.indexOf(type) == index)
+    .slice(0, 3);
+
   console.log("app.page.Page", { loaded, vehicles, logs });
 
   const recordLog = async (log: { vehicleId: string, type: string, entry: string }) => {
@@ -87,6 +96,28 @@ export default function Page() {
             </LogEntryDialog>
           ))}
         </div>
+        {recentCustomTypes.length > 0 &&
+          <div className="flex flex-col md:flex-row justify-center gap-1">
+            {recentCustomTypes.map((type: string) => (
+              <LogEntryDialog
+                key={type}
+                mode="custom"
+                defaultType={type}
+                vehicles={vehicles && Object.values(vehicles)}
+                defaultVehicleId={defaultVehicleId}
+                onSubmit={recordLog}
+              >
+                <Button
+                  variant="outline"
+                  disabled={!loaded}
+                  href="#"
+                >
+                  <span className="capitalize">{type}</span>
+                </Button>
+              </LogEntryDialog>
+            ))}
+          </div>
+        }
       </div>
 
       <div className="flex flex-row gap-2">

@@ -38,12 +38,14 @@ export default function LogEntryDialog({
   mode,
   vehicles,
   defaultVehicleId,
+  defaultType,
   onSubmit,
   children,
 }: {
   mode: LogEntryMode,
   vehicles?: Vehicle[],
   defaultVehicleId?: string,
+  defaultType?: string,
   onSubmit?: (log: { vehicleId: string, type: string, entry: string }) => void,
   children?: React.ReactNode,
 }) {
@@ -57,7 +59,7 @@ export default function LogEntryDialog({
   useEffect(() => {
     if (open) {
       setVehicleId(defaultVehicleId || sortedVehicles[0]?.id || "");
-      setType("");
+      setType(defaultType || "");
       setEntry("");
     }
   }, [open]);

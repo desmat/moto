@@ -61,6 +61,39 @@ test('front page loads, shows seeded entries, and records a journal entry', asyn
   await page.request.delete(`/api/logs/${log.id}`);
 });
 
+test('recent custom log types show as shortcut buttons that prefill the dialog', async ({ page }) => {
+  await page.goto('/');
+
+  // the seeded history (services/stores/memory.ts) has three custom-typed logs; their
+  // types should surface as quick-record buttons under the main Record row, most
+  // recent first
+  const shortcuts = ['oil change', 'chain adjustment', 'new tires'];
+  for (const type of shortcuts) {
+    await expect(page.getByRole('button', { name: type })).toBeVisible();
+  }
+  await pause(page);
+
+  // clicking one opens the custom-entry dialog with the type prefilled
+  await page.getByRole('button', { name: 'oil change' }).click();
+  await expect(page.getByRole('dialog', { name: 'Custom Entry' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Type' })).toHaveValue('oil change');
+  await pause(page);
+
+  // record through the prefilled dialog end-to-end
+  const entryText = `smoke test oil change ${Date.now()}`;
+  await page.getByRole('textbox', { name: 'Entry' }).fill(entryText);
+  const addResponsePromise = page.waitForResponse((res) =>
+    res.url().includes('/api/logs') && res.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Save' }).click();
+  const { log } = await (await addResponsePromise).json();
+  expect(log?.type).toBe('oil change');
+  expect(log?.entry).toBe(entryText);
+  await pause(page);
+
+  // cleanup (same reasoning as the journal-entry test above)
+  await page.request.delete(`/api/logs/${log.id}`);
+});
+
 test('Tailwind theme utilities are actually compiled into the page', async ({ page }) => {
   // Regression guard for the Tailwind v4 migration (JS config -> CSS-first @theme in
   // app/globals.css): if the @theme block's --color-* tokens ever stop generating
