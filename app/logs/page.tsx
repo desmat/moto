@@ -2,6 +2,7 @@
 
 import { sortBy } from "@desmat/utils";
 import { formatTimeFromNow } from "@desmat/utils/format";
+import { Paperclip } from "lucide-react";
 import Link from "next/link";
 import * as React from "react"
 import { Button } from "@/components/ui/button"
@@ -48,7 +49,16 @@ export default function Page() {
                     className="grid gap-0"
                     href={`/logs/${log.id}`}
                   >
-                    <span className="group-hover:underline capitalize-first">{log.entry?.trim()}</span>
+                    <span className="group-hover:underline capitalize-first">
+                      {/* photo-only entries (S4) have no text: fall back to a placeholder so the row isn't blank */}
+                      {log.entry?.trim() || "(photo)"}
+                      {log.attachmentCount > 0 &&
+                        <Paperclip
+                          aria-label="Has attachments"
+                          className="inline h-[0.9rem] ml-[0.1rem] mt-[-0.15rem] opacity-40"
+                        />
+                      }
+                    </span>
                     <div className="flex gap-2">
                       <span className="group-hover:underline opacity-40">
                         <span className="capitalize">{log.type}</span>
