@@ -44,6 +44,9 @@ export default defineConfig({
       STORE_TYPE: 'memory',
       // canned AI responses — tests must be deterministic and must not need/spend a real key
       AI_MOCK: 'true',
+      // client-side uploads (lib/upload.ts) short-circuit to a fake result — tests must
+      // not write to (or need) the real Blob store
+      BLOB_MOCK: 'true',
     },
   },
 });
