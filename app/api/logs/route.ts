@@ -1,6 +1,7 @@
 import { searchParamsToMap } from '@desmat/utils';
 import { NextRequest, NextResponse } from 'next/server'
 import trackEvent from '@/lib/trackEventServer';
+import { getAttachment, saveAttachment } from '@/services/attachments';
 import { getLogs, saveLog } from '@/services/logs';
 import { currentUser } from '@/services/users';
 import { getVehicle } from '@/services/vehicles';
@@ -41,8 +42,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { log } = await request.json();
-  console.log('app.api.logs.POST', { log });
+  const { log, attachmentIds } = await request.json();
+  console.log('app.api.logs.POST', { log, attachmentIds });
 
   // logs must belong to one of the caller's own vehicles
   const vehicle = log?.vehicleId && await getVehicle(log.vehicleId);
@@ -60,6 +61,22 @@ export async function POST(request: NextRequest) {
   const { id: _clientId, ...logData } = log;
 
   const newLog = await saveLog(logData, user);
+
+  // link pending attachments (uploaded before the log existed) to the new log; done
+  // server-side so a client dying mid-sequence can't leave half-linked state
+  if (newLog && Array.isArray(attachmentIds)) {
+    for (const attachmentId of attachmentIds) {
+      const attachment = await getAttachment(attachmentId);
+
+      // never re-link someone else's attachment, nor one already linked to another log
+      if (!attachment || attachment.userId != user.id || (attachment.logId && attachment.logId != newLog.id)) {
+        console.warn('app.api.logs.POST: skipping attachment link', { attachmentId, attachment });
+        continue;
+      }
+
+      await saveAttachment({ ...attachment, logId: newLog.id, vehicleId: newLog.vehicleId }, user);
+    }
+  }
 
   await trackEvent("log-created", {
     userId: user.id,

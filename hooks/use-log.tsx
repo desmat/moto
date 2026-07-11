@@ -62,7 +62,9 @@ export function useLog({ id, count, offset }: { id?: string, count?: number, off
   });
 
   const addMutation = useMutation({
-    mutationFn: async (log: any) => {
+    // attachmentIds ride alongside the log in the POST body (the route links them to
+    // the new log server-side), not on the log record itself
+    mutationFn: async ({ attachmentIds, ...log }: any) => {
       // optimistic update
       await queryClient.cancelQueries({ queryKey: [...queryKey, count, offset] });
       const data = queryClient.getQueryData([...queryKey, count, offset]) as any;
@@ -74,7 +76,7 @@ export function useLog({ id, count, offset }: { id?: string, count?: number, off
       const token = await getToken();
       const res = await fetch("/api/logs", {
         headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ log }),
+        body: JSON.stringify({ log, attachmentIds }),
         method: "POST",
       });
 
@@ -91,6 +93,8 @@ export function useLog({ id, count, offset }: { id?: string, count?: number, off
       queryClient.invalidateQueries({ queryKey });
       // a mileage log also updates the vehicle record's mileage server-side
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+      // and linked attachments gain a logId server-side
+      queryClient.invalidateQueries({ queryKey: ["attachments"] });
     },
   });
 
