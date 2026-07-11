@@ -132,6 +132,13 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+  /* Tailwind v4's preflight dropped v3's cursor: pointer on buttons (buttons now follow
+     the browser default). Restore it for anything clickable — real buttons, button-role
+     elements (nav items, dropdown triggers) — except when disabled. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 div[role="dialog"] {
