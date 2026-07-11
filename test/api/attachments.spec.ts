@@ -148,6 +148,100 @@ test('POST is idempotent by pathname', async ({ request }) => {
   await request.delete(`/api/attachments/${first.id}`);
 });
 
+// per the test-isolation convention these specs create their own vehicle rather than
+// mutating/depending on the seeded one
+const testVehicle = {
+  type: 'motorcycle',
+  maker: 'Test Maker',
+  model: 'Attachment Test Model',
+  year: 2021,
+  mileage: 1000,
+  modifications: [],
+};
+
+test('POST /api/logs with attachmentIds links the attachments to the new log', async ({ request }) => {
+  const vehicleRes = await request.post('/api/vehicles', { data: { vehicle: testVehicle } });
+  const { vehicle } = await vehicleRes.json();
+  expect(vehicle?.id).toBeTruthy();
+
+  const firstRes = await request.post('/api/attachments', {
+    data: { attachment: testAttachment('log-link-1') },
+  });
+  const { attachment: first } = await firstRes.json();
+  const secondRes = await request.post('/api/attachments', {
+    data: { attachment: testAttachment('log-link-2') },
+  });
+  const { attachment: second } = await secondRes.json();
+  expect(first?.id).toBeTruthy();
+  expect(second?.id).toBeTruthy();
+  expect(first?.logId).toBeFalsy();
+
+  const logRes = await request.post('/api/logs', {
+    data: {
+      log: { vehicleId: vehicle.id, type: 'journal', entry: 'entry with attachments' },
+      // a bogus id must be skipped without failing the save
+      attachmentIds: [first.id, second.id, 'does-not-exist'],
+    },
+  });
+  expect(logRes.ok()).toBeTruthy();
+  // response is still just the log, exactly as before
+  const { log } = await logRes.json();
+  expect(log?.id).toBeTruthy();
+  expect(log?.entry).toBe('entry with attachments');
+  expect(log?.attachmentIds).toBeUndefined();
+
+  // both attachments now carry the log's id and (denormalized) vehicle id
+  const listRes = await request.get(`/api/attachments?log=${log.id}`);
+  const { attachments } = await listRes.json();
+  expect(attachments.map((a: any) => a.id).sort()).toEqual([first.id, second.id].sort());
+  for (const linked of attachments) {
+    expect(linked.logId).toBe(log.id);
+    expect(linked.vehicleId).toBe(vehicle.id);
+  }
+
+  await request.delete(`/api/attachments/${first.id}`);
+  await request.delete(`/api/attachments/${second.id}`);
+  await request.delete(`/api/logs/${log.id}`);
+  await request.delete(`/api/vehicles/${vehicle.id}`);
+});
+
+test('POST /api/logs never re-links an attachment already linked to another log', async ({ request }) => {
+  const vehicleRes = await request.post('/api/vehicles', { data: { vehicle: testVehicle } });
+  const { vehicle } = await vehicleRes.json();
+  expect(vehicle?.id).toBeTruthy();
+
+  const otherLogId = `test-log-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const takenRes = await request.post('/api/attachments', {
+    data: { attachment: { ...testAttachment('log-taken'), logId: otherLogId } },
+  });
+  const { attachment: taken } = await takenRes.json();
+  expect(taken?.logId).toBe(otherLogId);
+
+  const logRes = await request.post('/api/logs', {
+    data: {
+      log: { vehicleId: vehicle.id, type: 'journal', entry: 'entry trying to steal an attachment' },
+      attachmentIds: [taken.id],
+    },
+  });
+  expect(logRes.ok()).toBeTruthy();
+  const { log } = await logRes.json();
+  expect(log?.id).toBeTruthy();
+
+  // the attachment stays with its original log, untouched
+  const getRes = await request.get(`/api/attachments/${taken.id}`);
+  const { attachment: after } = await getRes.json();
+  expect(after?.logId).toBe(otherLogId);
+  expect(after?.vehicleId).toBeFalsy();
+
+  const listRes = await request.get(`/api/attachments?log=${log.id}`);
+  const { attachments } = await listRes.json();
+  expect(attachments.map((a: any) => a.id)).not.toContain(taken.id);
+
+  await request.delete(`/api/attachments/${taken.id}`);
+  await request.delete(`/api/logs/${log.id}`);
+  await request.delete(`/api/vehicles/${vehicle.id}`);
+});
+
 test('attachment routes 404 for a missing id', async ({ request }) => {
   const missingGetRes = await request.get('/api/attachments/does-not-exist');
   expect(missingGetRes.status()).toBe(404);

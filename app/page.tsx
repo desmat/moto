@@ -55,7 +55,7 @@ export default function Page() {
 
   console.log("app.page.Page", { loaded, vehicles, logs });
 
-  const recordLog = async (log: { vehicleId: string, type: string, entry: string }) => {
+  const recordLog = async (log: { vehicleId: string, type: string, entry: string, attachmentIds: string[] }) => {
     const ret = await addLog(log);
     console.log("app.page.Page.recordLog", { ret });
   }
