@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useAttachment } from "@/hooks/use-attachment"
-import { useUserRecord } from "@/hooks/use-user"
+import { useAuth, useUserRecord } from "@/hooks/use-user"
 import { uploadFile } from "@/lib/upload"
 import { LogTypeJournal, LogTypeMileage } from "@/types/Log"
 import { Vehicle, vehicleName } from "@/types/Vehicle"
@@ -32,6 +32,11 @@ type PendingAttachment = {
   filename: string,
   status: "uploading" | "ready" | "error",
 };
+
+// the odometer-OCR call's lifecycle (mileage mode only): fires automatically when a
+// photo finishes uploading, and only ever decorates the field — the input stays an
+// ordinary editable input no matter what state this is in
+type OcrStatus = "idle" | "reading" | "done" | "low" | "failed";
 
 const ModeCopy: Record<LogEntryMode, { title: string, description: string }> = {
   journal: {
@@ -64,13 +69,21 @@ export default function LogEntryDialog({
   children?: React.ReactNode,
 }) {
   const { user } = useUserRecord();
+  const { getToken } = useAuth();
   const { add: addAttachment, delete: deleteAttachment } = useAttachment();
   const [open, setOpen] = useState(false);
   const [vehicleId, setVehicleId] = useState("");
   const [type, setType] = useState("");
   const [entry, setEntry] = useState("");
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const [ocr, setOcr] = useState<OcrStatus>("idle");
+  // first Save tap on a lower-than-current reading arms the inline "Save anyway"
+  // confirm; the second tap actually submits
+  const [saveWarningArmed, setSaveWarningArmed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // one OCR shot per attachment: guards the effect below against re-firing when the
+  // attachments array changes for unrelated reasons (another upload, a removal, ...)
+  const lastOcrAttachmentId = useRef<string | null>(null);
 
   const sortedVehicles = vehicles ? Object.values(vehicles).sort(sortBy('createdAt')) : [];
 
@@ -82,8 +95,63 @@ export default function LogEntryDialog({
       // uploads from a previous open are NOT deleted here: their records may already be
       // linked to a saved log, and unlinked ones are tolerated orphans (deferred cleanup)
       setAttachments([]);
+      setOcr("idle");
+      setSaveWarningArmed(false);
+      lastOcrAttachmentId.current = null;
     }
   }, [open]);
+
+  // changing the reading or the target vehicle invalidates an armed "Save anyway"
+  useEffect(() => {
+    setSaveWarningArmed(false);
+  }, [entry, vehicleId]);
+
+  const readOdometer = async (attachmentId: string) => {
+    lastOcrAttachmentId.current = attachmentId;
+    setOcr("reading");
+
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/ai/odometer", {
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ attachmentId }),
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        throw `${res.statusText} (${res.status})`;
+      }
+
+      const { result } = await res.json();
+      console.log("components.log-entry-dialog.readOdometer", { attachmentId, result });
+
+      if (result?.reading != null) {
+        setEntry(String(result.reading));
+        setOcr(result.confidence == "high" ? "done" : "low");
+      } else {
+        setOcr("failed");
+      }
+    } catch (error) {
+      // OCR is an accelerator, not a gate: any failure just leaves manual entry
+      console.error("components.log-entry-dialog.readOdometer", { attachmentId, error });
+      setOcr("failed");
+    }
+  }
+
+  // auto-fire OCR (mileage mode only) when the newest attachment finishes uploading and
+  // is an image, as long as the user hasn't already typed a reading
+  useEffect(() => {
+    if (mode != "mileage") return;
+
+    const newest = attachments[attachments.length - 1];
+    if (!newest || newest.status != "ready") return;
+    if (!newest.contentType?.startsWith("image/")) return;
+    if (newest.id == lastOcrAttachmentId.current) return;
+    if (entry != "") return;
+
+    readOdometer(newest.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachments]);
 
   const uploadPickedFile = async (file: File) => {
     // throwaway local key until the Attachment record exists
@@ -147,8 +215,20 @@ export default function LogEntryDialog({
       : entry?.trim().length > 0 || readyAttachments.length > 0)
     && (mode != "custom" || type?.trim().length > 0);
 
+  // sanity check: a reading below the vehicle's current mileage is usually a wrong
+  // bike or a mis-OCR, but corrections are legitimate — warn inline, don't block
+  const currentVehicleMileage = sortedVehicles.find((v) => v.id == vehicleId)?.mileage ?? 0;
+  const mileageBelowCurrent = mode == "mileage"
+    && Number.isFinite(parseFloat(entry))
+    && parseFloat(entry) < currentVehicleMileage;
+
   const submit = () => {
     if (!canSubmit) return;
+
+    if (mileageBelowCurrent && !saveWarningArmed) {
+      setSaveWarningArmed(true);
+      return;
+    }
 
     onSubmit && onSubmit({
       vehicleId,
@@ -216,8 +296,36 @@ export default function LogEntryDialog({
                 placeholder="18250"
                 value={entry}
                 onKeyDown={handleKeyDown}
-                onChange={(e) => setEntry(e.target.value)}
+                // a manual edit takes over from the OCR: clear its hint
+                onChange={(e) => { setEntry(e.target.value); setOcr("idle"); }}
               />
+              {/* one status line: the armed save warning wins over the OCR hint */}
+              {saveWarningArmed &&
+                <span className="text-sm text-amber-600">
+                  Lower than the current {currentVehicleMileage.toLocaleString()} — save anyway?
+                </span>
+              }
+              {!saveWarningArmed && ocr == "reading" &&
+                <span className="flex flex-row items-center gap-1 text-sm text-muted-foreground">
+                  <LoaderIcon className="h-4 w-4 animate-spin" />
+                  Reading odometer…
+                </span>
+              }
+              {!saveWarningArmed && ocr == "done" &&
+                <span className="text-sm text-muted-foreground">
+                  ✨ read from photo — check and save
+                </span>
+              }
+              {!saveWarningArmed && ocr == "low" &&
+                <span className="text-sm text-amber-600">
+                  ✨ best guess from photo — please verify
+                </span>
+              }
+              {!saveWarningArmed && ocr == "failed" &&
+                <span className="text-sm text-muted-foreground">
+                  Couldn&apos;t read the odometer — enter it manually
+                </span>
+              }
             </div>
           }
           {mode != "mileage" &&
@@ -301,7 +409,7 @@ export default function LogEntryDialog({
             Close
           </Button>
           <Button type="submit" onClick={submit} disabled={!canSubmit}>
-            Save
+            {saveWarningArmed ? "Save anyway" : "Save"}
           </Button>
         </DialogFooter>
       </DialogContent>
