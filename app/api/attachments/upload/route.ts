@@ -1,5 +1,6 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server'
+import { jsonError } from '@/lib/api';
 import { currentUser } from '@/services/users'
 
 // Token-exchange endpoint for direct client → Blob uploads (@vercel/blob/client's
@@ -46,9 +47,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     // onBeforeGenerateToken throws (auth/prefix rejections) surface here; the Blob SDK
     // convention is a 400 with the message in the body
-    return NextResponse.json(
-      { success: false, message: (error as Error).message },
-      { status: 400 }
-    );
+    return jsonError((error as Error).message, 400);
   }
 }

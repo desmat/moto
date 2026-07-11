@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { authorizationFailed, notFound } from '@/lib/api';
 import trackEvent from '@/lib/trackEventServer';
 import { currentUser, getUser, saveUser } from '@/services/users'
 
@@ -7,19 +8,13 @@ export async function GET(request: NextRequest) {
   console.log('app.api.user.GET', { user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const userRecord = await getUser(user.id);
 
   if (!userRecord) {
-    return NextResponse.json(
-      { success: false, message: 'not found' },
-      { status: 404 }
-    );
+    return notFound();
   }
 
   return NextResponse.json({ user: userRecord });
@@ -30,19 +25,13 @@ export async function PUT(request: NextRequest) {
   console.log('app.api.user.PUT', { user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const existing = await getUser(user.id);
 
   if (!existing) {
-    return NextResponse.json(
-      { success: false, message: 'not found' },
-      { status: 404 }
-    );
+    return notFound();
   }
 
   const { user: value } = await request.json();

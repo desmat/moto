@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import OpenAI from "openai";
 
 // Single source of truth for model names — nothing else in the codebase names a model.
@@ -23,11 +25,18 @@ function getClient(): OpenAI {
 // must not need (or spend) a real API key. Short-circuits before any network call.
 const mock = () => process.env.AI_MOCK == "true";
 
-// Canned responses for AI_MOCK, keyed by schemaName. Each story registers its schema's
-// mock here (S6 adds "odometer"). A test hitting an unmocked schema is a bug → throw.
-const MOCKS: Record<string, any> = {
-  odometer: { odometer_digits_clearly_visible: true, reading: 12345, unit: "km", confidence: "high" },
-};
+// Canned responses for AI_MOCK live in test/fixtures/ai-mocks.json, keyed by
+// schemaName — test data, so it belongs with the fixtures, and it's only ever read
+// when mock mode is on (lazily, so the normal path never touches the filesystem).
+// This module is server-only Node runtime (API routes/services, never proxy.ts's Edge
+// runtime), so fs is available. A test hitting an unmocked schema is a bug → throw.
+let mocks: Record<string, any> | undefined;
+function loadMocks(): Record<string, any> {
+  if (!mocks) {
+    mocks = JSON.parse(fs.readFileSync(path.join(process.cwd(), "test/fixtures/ai-mocks.json"), "utf8"));
+  }
+  return mocks!;
+}
 
 export async function extractFromImage<T>({ imageUrl, prompt, schemaName, schema }: {
   imageUrl: string,   // blob URL (public-but-unguessable) — passed straight to OpenAI, no re-download
@@ -38,10 +47,11 @@ export async function extractFromImage<T>({ imageUrl, prompt, schemaName, schema
   console.log("services.ai.extractFromImage", { schemaName, imageUrl });
 
   if (mock()) {
-    if (!(schemaName in MOCKS)) {
-      throw new Error(`services.ai.extractFromImage(${schemaName}): no mock registered (AI_MOCK=true)`);
+    const mocks = loadMocks();
+    if (!(schemaName in mocks)) {
+      throw new Error(`services.ai.extractFromImage(${schemaName}): no mock registered in test/fixtures/ai-mocks.json (AI_MOCK=true)`);
     }
-    return MOCKS[schemaName] as T;
+    return mocks[schemaName] as T;
   }
 
   try {
