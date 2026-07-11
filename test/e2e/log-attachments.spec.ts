@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
+import { smokeTestUserId } from '../../services/stores/memory';
 
 // covers S4's attach-in-the-log-dialog flow end-to-end under BLOB_MOCK + memory store:
 // picking a file uploads immediately (mocked) and creates an Attachment record, an
@@ -75,33 +76,71 @@ test('a journal entry with a photo and no text can be saved, with the attachment
   await page.request.delete(`/api/vehicles/${vehicle.id}`);
 });
 
-// S5: the seeded attachment (attachment-smoketest, linked to the seeded "new tires" log
-// smoke-log-7) is a READ-ONLY fixture -- these specs only assert on it, never mutate or
-// delete it. Its url is a data-URL so nothing depends on a real Blob store. The dashboard
-// only shows the 5 newest entries and smoke-log-7 sits below that cut (plus parallel specs
-// add their own logs), so the list indicator is asserted on the Logs page instead.
-test('the seeded attachment shows a paperclip in the logs list and a thumbnail on the detail page', async ({ page }) => {
+// S5: list indicator + detail-page thumbnail. The spec creates ALL of its own data via
+// the API (vehicle → two logs → one attachment linked to one of them) rather than
+// asserting on the memory-store seeds -- seed ids/ordering are dev conveniences, not a
+// test contract, and rows created here have unique hrefs so the assertions don't care
+// where the rows sit or what parallel specs are doing. The attachment url is a tiny
+// data-URL so nothing depends on a real Blob store.
+test('a log with an attachment shows a paperclip in the logs list and a thumbnail on the detail page', async ({ page }) => {
+  const vehicleRes = await page.request.post('/api/vehicles', { data: { vehicle: testVehicle } });
+  const { vehicle } = await vehicleRes.json();
+  expect(vehicle?.id).toBeTruthy();
+
+  const withLogRes = await page.request.post('/api/logs', {
+    data: { log: { vehicleId: vehicle.id, type: 'journal', entry: 'entry with an indicator' } },
+  });
+  const { log: withLog } = await withLogRes.json();
+  const withoutLogRes = await page.request.post('/api/logs', {
+    data: { log: { vehicleId: vehicle.id, type: 'journal', entry: 'entry without one' } },
+  });
+  const { log: withoutLog } = await withoutLogRes.json();
+  expect(withLog?.id).toBeTruthy();
+  expect(withoutLog?.id).toBeTruthy();
+
+  // 1x1 PNG data-URL; unique pathname per run to dodge the POST's pathname idempotency
+  const filename = `indicator-${Date.now()}-${Math.random().toString(16).slice(2, 8)}.png`;
+  const attachmentRes = await page.request.post('/api/attachments', {
+    data: {
+      attachment: {
+        logId: withLog.id,
+        url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+        pathname: `moto/${smokeTestUserId}/${filename}`,
+        contentType: 'image/png',
+        size: 68,
+        filename,
+      },
+    },
+  });
+  const { attachment } = await attachmentRes.json();
+  expect(attachment?.id).toBeTruthy();
+
   await page.goto('/logs');
 
-  // the seeded "new tires" row carries the attachment indicator out of the box...
-  const rowWithAttachment = page.locator('a[href="/logs/smoke-log-7"]');
+  // the linked row carries the attachment indicator...
+  const rowWithAttachment = page.locator(`a[href="/logs/${withLog.id}"]`);
   await expect(rowWithAttachment).toBeVisible();
   await expect(rowWithAttachment.getByLabel('Has attachments')).toBeVisible();
 
-  // ...and a seeded row without attachments doesn't
-  const rowWithout = page.locator('a[href="/logs/smoke-log-3"]');
+  // ...and the attachment-less row doesn't
+  const rowWithout = page.locator(`a[href="/logs/${withoutLog.id}"]`);
   await expect(rowWithout).toBeVisible();
   await expect(rowWithout.getByLabel('Has attachments')).toHaveCount(0);
 
   // the detail page renders the image as a thumbnail wrapped in a new-tab link to the
   // full-size url
-  await page.goto('/logs/smoke-log-7');
-  const thumbnail = page.getByAltText('new-tires.png');
+  await page.goto(`/logs/${withLog.id}`);
+  const thumbnail = page.getByAltText(filename);
   await expect(thumbnail).toBeVisible();
   await expect(thumbnail).toHaveAttribute('src', /^data:image\/png/);
 
   const link = page.locator('a[target="_blank"]', { has: thumbnail });
   await expect(link).toHaveAttribute('href', /^data:image\/png/);
+
+  // cleanup (deleting withLog cascades to the attachment)
+  await page.request.delete(`/api/logs/${withLog.id}`);
+  await page.request.delete(`/api/logs/${withoutLog.id}`);
+  await page.request.delete(`/api/vehicles/${vehicle.id}`);
 });
 
 test('removing a pending attachment deletes its record and disables Save again', async ({ page }) => {
