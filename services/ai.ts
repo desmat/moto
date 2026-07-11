@@ -6,6 +6,9 @@ import OpenAI from "openai";
 const MODELS = {
   // vision-capable + supports structured outputs (response_format json_schema, strict)
   vision: "gpt-4o",
+  // 1536 dimensions — the Upstash Vector index must be created with cosine metric and
+  // this exact dimension count (services/vector.ts assumes they match).
+  embedding: "text-embedding-3-small",
 };
 
 // Lazily constructed so importing this module without OPENAI_API_KEY set (builds,
@@ -80,5 +83,60 @@ export async function extractFromImage<T>({ imageUrl, prompt, schemaName, schema
   } catch (err: any) {
     // wrap with context; routes turn thrown errors into 5xx JSON
     throw new Error(`services.ai.extractFromImage(${schemaName}): ${err.message}`);
+  }
+}
+
+// Mock embeddings live here in code (not in test/fixtures/ai-mocks.json — that registry
+// is for static canned responses; an embedding is a function of its input): deterministic
+// bag-of-words hash vectors — each token is hashed into one of a fixed 256 dimensions,
+// the token counts summed, and the result normalized, so token overlap ≈ cosine
+// similarity. Real enough for "search finds the chunk containing the query words".
+// NOTE the dimension mismatch is deliberate: mock vectors are 256-dim while the real
+// model's are 1536-dim — fine, because the mock vector store in services/vector.ts
+// (also gated on AI_MOCK) is the only thing that ever sees mock vectors.
+const MOCK_EMBED_DIMS = 256;
+function mockEmbed(text: string): number[] {
+  const vector = new Array(MOCK_EMBED_DIMS).fill(0);
+  for (const token of text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)) {
+    // FNV-1a over the token's chars picks its dimension
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < token.length; i++) {
+      hash ^= token.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    vector[(hash >>> 0) % MOCK_EMBED_DIMS] += 1;
+  }
+  const norm = Math.sqrt(vector.reduce((sum: number, x: number) => sum + x * x, 0)) || 1;
+  return vector.map((x: number) => x / norm);
+}
+
+export async function embed(texts: string[]): Promise<number[][]> {
+  console.log("services.ai.embed", { count: texts.length });
+
+  if (mock()) {
+    return texts.map(mockEmbed);
+  }
+
+  try {
+    // ≤ 100 inputs per API call; loop for more
+    const BATCH_SIZE = 100;
+    const vectors: number[][] = [];
+    for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+      const response = await getClient().embeddings.create({
+        model: MODELS.embedding,
+        input: texts.slice(i, i + BATCH_SIZE),
+      });
+      // sort by index defensively — the API documents data[] as input-ordered, but each
+      // entry carries its index, so honor it
+      vectors.push(
+        ...response.data
+          .sort((a, b) => a.index - b.index)
+          .map((d) => d.embedding)
+      );
+    }
+    return vectors;
+  } catch (err: any) {
+    // wrap with context; routes turn thrown errors into 5xx JSON
+    throw new Error(`services.ai.embed: ${err.message}`);
   }
 }
