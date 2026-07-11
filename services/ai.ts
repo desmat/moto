@@ -26,7 +26,7 @@ const mock = () => process.env.AI_MOCK == "true";
 // Canned responses for AI_MOCK, keyed by schemaName. Each story registers its schema's
 // mock here (S6 adds "odometer"). A test hitting an unmocked schema is a bug → throw.
 const MOCKS: Record<string, any> = {
-  // odometer: added in S6
+  odometer: { odometer_digits_clearly_visible: true, reading: 12345, unit: "km", confidence: "high" },
 };
 
 export async function extractFromImage<T>({ imageUrl, prompt, schemaName, schema }: {
