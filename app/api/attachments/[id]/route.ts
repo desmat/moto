@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { authorizationFailed, canAccess, notFound } from '@/lib/api';
 import trackEvent from '@/lib/trackEventServer';
 import { deleteAttachment, getAttachment, saveAttachment } from '@/services/attachments';
 import { currentUser } from '@/services/users'
@@ -12,26 +13,17 @@ export async function GET(
   console.log('app.api.attachments.[id].GET', { id, user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const attachment = await getAttachment(id);
 
   if (!attachment) {
-    return NextResponse.json(
-      { success: false, message: 'not found' },
-      { status: 404 }
-    );
+    return notFound();
   }
 
-  if (!(attachment.userId == user.id || user.publicMetadata?.isAdmin)) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+  if (!canAccess(user, attachment)) {
+    return authorizationFailed();
   }
 
   return NextResponse.json({ attachment });
@@ -46,26 +38,17 @@ export async function PUT(
   console.log('app.api.attachments.[id].PUT', { id, user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const existing = await getAttachment(id);
 
   if (!existing) {
-    return NextResponse.json(
-      { success: false, message: 'not found' },
-      { status: 404 }
-    );
+    return notFound();
   }
 
-  if (!(existing.userId == user.id || user.publicMetadata?.isAdmin)) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+  if (!canAccess(user, existing)) {
+    return authorizationFailed();
   }
 
   const { attachment } = await request.json();
@@ -103,26 +86,17 @@ export async function DELETE(
   console.log('app.api.attachments.[id].DELETE', { id, user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const existing = await getAttachment(id);
 
   if (!existing) {
-    return NextResponse.json(
-      { success: false, message: 'not found' },
-      { status: 404 }
-    );
+    return notFound();
   }
 
-  if (!(existing.userId == user.id || user.publicMetadata?.isAdmin)) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+  if (!canAccess(user, existing)) {
+    return authorizationFailed();
   }
 
   const deleted = await deleteAttachment(id);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { authorizationFailed, canAccess, notFound } from '@/lib/api';
 import trackEvent from '@/lib/trackEventServer';
 import { currentUser } from '@/services/users'
 import { deleteVehicle, getVehicle, saveVehicle } from '@/services/vehicles';
@@ -12,26 +13,17 @@ export async function GET(
   console.log('app.api.vehicles.[id].GET', { id, user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const vehicle = await getVehicle(id);
 
   if (!vehicle) {
-    return NextResponse.json(
-      { success: false, message: 'not found' },
-      { status: 404 }
-    );
+    return notFound();
   }
 
-  if (!(vehicle.userId == user.id || user.publicMetadata?.isAdmin)) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+  if (!canAccess(user, vehicle)) {
+    return authorizationFailed();
   }
 
   return NextResponse.json({ vehicle });
@@ -46,26 +38,17 @@ export async function PUT(
   console.log('app.api.vehicles.[id].PUT', { id, user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const existing = await getVehicle(id);
 
   if (!existing) {
-    return NextResponse.json(
-      { success: false, message: 'not found' },
-      { status: 404 }
-    );
+    return notFound();
   }
 
-  if (!(existing.userId == user.id || user.publicMetadata?.isAdmin)) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+  if (!canAccess(user, existing)) {
+    return authorizationFailed();
   }
 
   const { vehicle } = await request.json();
@@ -97,26 +80,17 @@ export async function DELETE(
   console.log('app.api.vehicles.[id].DELETE', { id, user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const existing = await getVehicle(id);
 
   if (!existing) {
-    return NextResponse.json(
-      { success: false, message: 'not found' },
-      { status: 404 }
-    );
+    return notFound();
   }
 
-  if (!(existing.userId == user.id || user.publicMetadata?.isAdmin)) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+  if (!canAccess(user, existing)) {
+    return authorizationFailed();
   }
 
   const deleted = await deleteVehicle(id);

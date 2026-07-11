@@ -1,5 +1,6 @@
 import { searchParamsToMap } from '@desmat/utils';
 import { NextRequest, NextResponse } from 'next/server'
+import { authorizationFailed, badRequest } from '@/lib/api';
 import trackEvent from '@/lib/trackEventServer';
 import { getAttachment, getAttachments, saveAttachment } from '@/services/attachments';
 import { getLogs, saveLog } from '@/services/logs';
@@ -12,10 +13,7 @@ export async function GET(request: NextRequest, params?: any) {
   console.log('app.api.logs.GET', { query, user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const count = Number(query.count) || undefined;
@@ -52,10 +50,7 @@ export async function POST(request: NextRequest) {
   console.log('app.api.logs.POST', { user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const { log, attachmentIds } = await request.json();
@@ -65,10 +60,7 @@ export async function POST(request: NextRequest) {
   const vehicle = log?.vehicleId && await getVehicle(log.vehicleId);
 
   if (!vehicle || vehicle.userId != user.id) {
-    return NextResponse.json(
-      { success: false, message: 'invalid vehicleId' },
-      { status: 400 }
-    );
+    return badRequest('invalid vehicleId');
   }
 
   // strip any client-supplied id (the store mints one on create) rather than setting it

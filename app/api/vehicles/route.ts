@@ -1,5 +1,6 @@
 import { searchParamsToMap } from '@desmat/utils';
 import { NextRequest, NextResponse } from 'next/server'
+import { authorizationFailed } from '@/lib/api';
 import trackEvent from '@/lib/trackEventServer';
 import { currentUser } from '@/services/users'
 import { getVehicles, saveVehicle } from '@/services/vehicles';
@@ -10,10 +11,7 @@ export async function GET(request: NextRequest, params?: any) {
   console.log('app.api.vehicles.GET', { query, user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const vehicles = await getVehicles({ ...query, user: user.id });
@@ -26,10 +24,7 @@ export async function POST(request: NextRequest) {
   console.log('app.api.vehicles.POST', { user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const { vehicle } = await request.json();

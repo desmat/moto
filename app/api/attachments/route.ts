@@ -1,5 +1,6 @@
 import { searchParamsToMap } from '@desmat/utils';
 import { NextRequest, NextResponse } from 'next/server'
+import { authorizationFailed, badRequest } from '@/lib/api';
 import trackEvent from '@/lib/trackEventServer';
 import { getAttachments, saveAttachment } from '@/services/attachments';
 import { currentUser } from '@/services/users'
@@ -10,10 +11,7 @@ export async function GET(request: NextRequest, params?: any) {
   console.log('app.api.attachments.GET', { query, user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const attachments = await getAttachments({ ...query, user: user.id });
@@ -26,10 +24,7 @@ export async function POST(request: NextRequest) {
   console.log('app.api.attachments.POST', { user });
 
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'authorization failed' },
-      { status: 403 }
-    );
+    return authorizationFailed();
   }
 
   const { attachment } = await request.json();
@@ -38,10 +33,7 @@ export async function POST(request: NextRequest) {
   // a client may only claim blobs uploaded under its own prefix (the upload token
   // enforces the same prefix at upload time; this closes the record side)
   if (!attachment?.pathname || !attachment.pathname.startsWith(`moto/${user.id}/`)) {
-    return NextResponse.json(
-      { success: false, message: 'invalid pathname' },
-      { status: 400 }
-    );
+    return badRequest('invalid pathname');
   }
 
   // idempotency: the client creates the record right after a successful blob upload; if
