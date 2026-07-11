@@ -26,15 +26,20 @@ Extend `fieldDisplayOrder`. (`lookups` unchanged — `type: "type"` already enab
 
 Refactor the existing mileage-sync block: fetch the vehicle once; compute the candidate reading (`type == mileage` → `parseFloat(entry)`, overwrite-always; `saved.mileage` present on other types → monotonic guard per Design); same ownership/`isFinite` guards. Keep the existing comment and extend it with the monotonic rationale. (S12 extends this same block with the components update — coordinate if landing together.)
 
-### Create `app/api/ai/receipt/route.ts`
+### Create `services/receipt.ts` + `app/api/ai/receipt/route.ts`
 
-Copy `app/api/ai/odometer/route.ts` (S6) verbatim in shape: auth → attachment → ownership → image check → `extractFromImage` → 502 on AI failure → `trackEvent("receipt-ocr", ...)`. Schema (`schemaName: "receipt"`):
+Copy the S6 shape **as it shipped** (handover: post-landing refactor split it): domain logic — type, JSON schema, prompt — in `services/receipt.ts` behind `readReceipt(imageUrl)`, mirroring `services/odometer.ts`; the route a thin HTTP shell: auth → attachment → ownership → image check → `readReceipt` → 502 on AI failure → `trackEvent("receipt-ocr", ...)`. Schema (`schemaName: "receipt"`):
 ```
-{ date: string | null (YYYYMMDD), vendor: string | null, mileage: number | null,
+{ receipt_clearly_visible: boolean,   // FIRST field — the S6 anti-hallucination gate
+                                      // (gpt-4o fabricates plausible extractions for
+                                      // unreadable images; the leading boolean commit
+                                      // is the fix, prompt-only warnings are not —
+                                      // see services/odometer.ts)
+  date: string | null (YYYYMMDD), vendor: string | null, mileage: number | null,
   totalCost: number | null,
   items: [{ key (from CANONICAL_COMPONENT_KEYS or best kebab-case), name, action, note, cost: number | null }] }
 ```
-Prompt shares `CANONICAL_COMPONENT_KEYS` with S10's (import the const; the convergence of "front tyre"/"fr tire" → `front-tire` across receipts and manuals is what makes Phase 3 matching key-equality). Add a `receipt` entry to `MOCKS` (2–3 line items incl. one `replace`, a vendor, a backdated date, mileage below the seeded 18,250).
+Gate `false` → nulls + empty `items`; the dialog degrades to a mostly-empty editable form (the phase AC's failure path). Prompt framed as a strict transcriber (borrow `ODOMETER_PROMPT`'s framing) and shares `CANONICAL_COMPONENT_KEYS` with S10's (import the const; the convergence of "front tyre"/"fr tire" → `front-tire` across receipts and manuals is what makes Phase 3 matching key-equality). Add a `receipt` entry to **`test/fixtures/ai-mocks.json`** (handover: the mock registry; no `MOCKS` const exists) — gate `true`, 2–3 line items incl. one `replace`, a vendor, a backdated date, mileage below the seeded 18,250.
 
 ### Create `components/service-log-dialog.tsx`
 
@@ -48,7 +53,7 @@ Same Dialog skeleton as `log-entry-dialog.tsx` (vehicle picker, reset-on-open, c
 
 ## Tests
 
-- `test/api/receipts.spec.ts`: OCR route with fake image attachment → canned extraction (`AI_MOCK`); non-image → 400. POST a service log with items + `mileage: 5000` against a fresh vehicle (`mileage: 1000`) → vehicle at 5000; then a backdated service log with `mileage: 3000` → vehicle *stays* 5000; then a mileage-type log `"2500"` → vehicle 2500 (overwrite-always preserved). Hostile structured fields on a journal log are simply stored-but-inert (documented behavior, assert no crash).
+- `test/api/receipts.spec.ts`: OCR route with fake image attachment → canned extraction (`AI_MOCK`); non-image → 400. POST a service log with items + `mileage: 5000` against a fresh vehicle (`mileage: 1000`) → vehicle at 5000; then a backdated service log with `mileage: 3000` → vehicle *stays* 5000; then a mileage-type log `"2500"` → vehicle 2500 (overwrite-always preserved). Hostile structured fields on a journal log are simply stored-but-inert (documented behavior, assert no crash) — and stay inert in S12 too: the `vehicle.components` update is restricted to `service`-type logs (S0 review decision aligning the two plans; S12's spec asserts it).
 - e2e: dashboard → Service / Receipt → `setInputFiles(test/fixtures/receipt.jpg)` → form pre-fills from mock → edit one line → save → entry appears with Wrench icon and paperclip.
 
 ## Steps

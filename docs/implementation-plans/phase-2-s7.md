@@ -17,7 +17,7 @@ Story: [phase-2.md](../phase-2.md) § S7. Depends on S1 (`services/ai.ts`). Unbl
 ```ts
 export async function embed(texts: string[]): Promise<number[][]>
 ```
-Batches of ≤ 100 inputs per API call (loop for more); `AI_MOCK` → hash vectors per above. Standard `console.log("services.ai.embed", { count: texts.length })`.
+Batches of ≤ 100 inputs per API call (loop for more); `AI_MOCK` → hash vectors per above. Standard `console.log("services.ai.embed", { count: texts.length })`. (Handover note: Phase 1's canned mocks live in `test/fixtures/ai-mocks.json`, not a `MOCKS` const — but that registry is for static responses; the embed mock is a function of its input, so its hash-vector code lives in `services/ai.ts`'s mock branch directly.)
 
 ### Create `services/vector.ts`
 
@@ -34,7 +34,7 @@ export async function queryChunks(text: string, filter: { userId: string, vehicl
 export async function deleteByDocument(documentId: string, userId: string): Promise<void>
 ```
 
-Lazy `Index` construction (throw a clear error naming `UPSTASH_VECTOR_REST_URL`/`UPSTASH_VECTOR_REST_TOKEN` if unset — same lazy-client pattern as S1). `deleteByDocument`: query ids by filter and delete (Upstash supports delete-by-filter on paid tiers; use the query-then-delete-ids form so it works everywhere).
+Lazy `Index` construction (throw a clear error naming `UPSTASH_VECTOR_REST_URL`/`UPSTASH_VECTOR_REST_TOKEN` if unset — same lazy-client pattern as S1). `deleteByDocument`: **delete by id prefix** — `index.delete({ prefix: \`${documentId}:\` })` — which the `"{documentId}:{chunkIndex}"` id scheme enables and which works on all Upstash tiers. (S0 review correction: the original "query ids by filter then delete" isn't a thing — Upstash queries need a query vector, and delete-by-metadata-filter is paid-tier only.) ⚠ Prefix delete ignores metadata, so it cannot enforce tenant isolation itself: the `userId` param exists as a documented contract that **callers must have ownership-checked the document before calling** (S8's delete path does — it loads the Document record and `canAccess`-checks it first). The mock store implements the same prefix semantics.
 
 ### Modify
 
