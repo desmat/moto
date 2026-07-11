@@ -3,6 +3,7 @@ import { MemoryStore } from "@desmat/redis-store";
 import { User } from "../../types/User";
 import { Vehicle } from "../../types/Vehicle";
 import { Log } from "../../types/Log";
+import { Attachment } from "../../types/Attachment";
 import { storeConfigs, StoreEntityName } from "./config";
 
 // Keep in sync with playwright.config.ts's IMPERSONATE_USER_ID -- vehicles/logs are
@@ -52,6 +53,24 @@ const seed: Partial<Record<StoreEntityName, any[]>> = {
       modifications: [],
     },
   ],
+  // one image attachment linked to the seeded "new tires" log (smoke-log-7, see
+  // buildLogSeeds below) so attachment indicators/galleries have something to render out
+  // of the box. The pathname is fake-but-well-formed (`moto/{userId}/...`); the url is a
+  // tiny inline data-URL PNG so nothing depends on a real Blob store.
+  attachments: [
+    {
+      id: "attachment-smoketest",
+      createdAt: 1700000002000,
+      userId: smokeTestUserId,
+      logId: "smoke-log-7",
+      vehicleId: smokeTestVehicleId,
+      url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+      pathname: `moto/${smokeTestUserId}/seed-new-tires.png`,
+      contentType: "image/png",
+      size: 68,
+      filename: "new-tires.png",
+    },
+  ],
 };
 
 // A handful of Log records for smokeTestUserId spread over the last couple of weeks so
@@ -91,6 +110,7 @@ function buildStore({ debug }: { debug?: boolean }) {
     users: new MemoryStore<User>({ ...storeConfigs.users, debug, seed: seed.users }),
     vehicles: new MemoryStore<Vehicle>({ ...storeConfigs.vehicles, debug, seed: seed.vehicles }),
     logs: new MemoryStore<Log>({ ...storeConfigs.logs, debug, seed: buildLogSeeds() }),
+    attachments: new MemoryStore<Attachment>({ ...storeConfigs.attachments, debug, seed: seed.attachments }),
   };
 }
 

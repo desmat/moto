@@ -1,4 +1,5 @@
 export type TrackingEventType =
+  | "attachment-created" | "attachment-deleted" | "attachment-updated"
   | "log-created" | "log-deleted" | "log-updated"
   | "user-updated"
   | "vehicle-created" | "vehicle-deleted" | "vehicle-updated";
