@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation";
-import { AppLogo, NavItems } from '@/components/app-sidebar';
+import { AppLogo, useNavItems } from '@/components/app-sidebar';
 import { AlignJustify, CircleUser } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserButton } from '@clerk/nextjs';
@@ -48,6 +48,7 @@ function MoreMenu({
 export function AppBottomBar() {
   // impersonation and mock-auth mode both stand in a fixed user id, so neither can render the real Clerk UserButton
   const impersonatedUserId = process.env.IMPERSONATE_USER_ID || (isMockAuthEnabledClient() && mockUser.id);
+  const baseNavItems = useNavItems();
 
   const navItems = [
     {
@@ -55,7 +56,7 @@ export function AppBottomBar() {
       icon: AppLogo,
       url: "/"
     },
-    ...NavItems,
+    ...baseNavItems,
   ];
 
   const menuItems = [

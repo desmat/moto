@@ -5,9 +5,12 @@ import { formatTimeFromNow } from "@desmat/utils/format";
 import { Gauge, NotebookPen, Paperclip, Wrench } from "lucide-react";
 import Link from "next/link";
 import LogEntryDialog, { LogEntryMode } from "@/components/log-entry-dialog";
-import DailyGauge from "@/components/charts/DailyGauge";
-import DailySummaryChart from "@/components/charts/DailySummaryChart";
-import HourlyPatternChart from "@/components/charts/HourlyPatternChart";
+// charts deliberately disabled for now (they render dummy data) -- revive these imports
+// and the Charts section below once real reporting lands (roadmap 4.2, via the unused
+// `counters` mechanism in @desmat/redis-store)
+// import DailyGauge from "@/components/charts/DailyGauge";
+// import DailySummaryChart from "@/components/charts/DailySummaryChart";
+// import HourlyPatternChart from "@/components/charts/HourlyPatternChart";
 import { Button } from "@/components/ui/button";
 import { useLog } from "@/hooks/use-log";
 import { useUser } from "@/hooks/use-user";
@@ -120,6 +123,10 @@ export default function Page() {
         }
       </div>
 
+      {/* Charts deliberately disabled: they only ever rendered deterministic dummy data
+          (components/charts/dummy-data.ts). Revive this section (and the imports up top)
+          once real per-user reporting exists — roadmap 4.2, backed by the `counters`
+          mechanism in @desmat/redis-store that nothing uses yet.
       <div className="flex flex-row gap-2">
         <b>Charts</b>
       </div>
@@ -134,13 +141,14 @@ export default function Page() {
       <div className="_bg-pink-200 flex flex-col w-full">
         <DailySummaryChart />
       </div>
+      */}
 
       <div className="flex flex-col items-center gap-2">
         <div className="flex flex-row gap-2 relative">
           <b>Entries</b>
         </div>
         <div className="flex flex-col gap-3 max-w-full">
-          {latestLogs && latestLogs.slice(0, 5).map((log: any) => {
+          {latestLogs && latestLogs.slice(0, 10).map((log: any) => {
             const Icon = logIcon(log.type);
             const vehicle = vehicles && vehicles[log.vehicleId];
 
@@ -174,7 +182,7 @@ export default function Page() {
               </div>
             );
           })}
-          {latestLogs && latestLogs.length > 5 &&
+          {latestLogs && latestLogs.length > 10 &&
             <Button
               variant="link"
               href="/logs"

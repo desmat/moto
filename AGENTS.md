@@ -20,6 +20,8 @@ Tests live under `test/`: `test/e2e` for browser-driven UI specs, `test/api` for
 
 **Next 16 gotcha**: Next allows only one dev server per project directory — a second `next dev` refuses to start ("Another next dev server is already running"), *even on a different port*; the lock is per-directory, not per-port. In practice: `npm run test` fails at its webServer step whenever any dev server for this repo is already running (the usual `npm run dev`, or a throwaway one started for screenshots) — stop it first (the error message prints the PID to kill).
 
+**Stale `.next` gotcha**: if e2e specs start failing with page content mysteriously not rendering (sidebar present, `<main>` empty) and the webServer output shows `[browser] ⨯ unhandledRejection: ChunkLoadError: Failed to load chunk …`, the Turbopack dev cache is corrupt — `rm -rf .next` and rerun. Seen after alternating dev-server sessions with different env (e.g. a manual `npm run dev` with real-key env between test runs); the failures look flaky and land on unrelated specs.
+
 ## Architecture
 
 MotoGPT is a Next.js 14 App Router app for tracking motorcycle maintenance (vehicles, mileage, maintenance/journal logs) with AI-generated service recommendations planned (`/insights` is currently a placeholder).

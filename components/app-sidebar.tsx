@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useUser } from "@/hooks/use-user";
+import { useVehicle } from "@/hooks/use-vehicle";
 import { isMockAuthEnabledClient, mockUser } from "@/lib/mock-auth";
 
 export const AppLogo = Motorbike;
@@ -61,6 +62,24 @@ export const NavItems = [
     icon: CircleUser,
   },
 ]
+
+// Nav items adjusted for the single-vehicle case: with exactly one vehicle the
+// "Vehicles" list page is pure indirection, so the item goes singular and links straight
+// to that vehicle (the detail page offers an "Add another vehicle" affordance, and the
+// nav flips back to the plural list as soon as a second vehicle exists). Used by both
+// the sidebar and the bottom bar so the two stay in sync.
+export function useNavItems() {
+  const { loaded, vehicles } = useVehicle();
+  const vehicleList: any[] = loaded && vehicles ? Object.values(vehicles) : [];
+
+  if (vehicleList.length == 1) {
+    return NavItems.map((item) => item.url == "/vehicles"
+      ? { ...item, title: "Vehicle", url: `/vehicles/${vehicleList[0].id}` }
+      : item);
+  }
+
+  return NavItems;
+}
 
 function UserMenu({
   impersonatedUserId,
@@ -121,6 +140,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const sidebar = useSidebar();
   const [sidebarAnimating, setSidebarAnimating] = React.useState(false);
   const activeTeam = data.teams[0];
+  const navItems = useNavItems();
   const { user, isLoaded: userLoaded } = useUser();
   const userIsAdmin = userLoaded && user?.publicMetadata?.isAdmin as boolean;
   // impersonation and mock-auth mode both stand in a fixed user id, so neither can render the real Clerk UserButton
@@ -182,7 +202,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent className="gap-1">
         {/* @ts-ignore */}
-        <NavMain items={NavItems} />
+        <NavMain items={navItems} />
       </SidebarContent>
       <SidebarFooter>
         {/* Show requires a mounted ClerkProvider, which mock-auth mode skips entirely */}
