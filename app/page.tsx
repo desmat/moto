@@ -2,7 +2,7 @@
 
 import { sortBy } from "@desmat/utils";
 import { formatTimeFromNow } from "@desmat/utils/format";
-import { Gauge, NotebookPen, Wrench } from "lucide-react";
+import { Gauge, NotebookPen, Paperclip, Wrench } from "lucide-react";
 import Link from "next/link";
 import LogEntryDialog, { LogEntryMode } from "@/components/log-entry-dialog";
 import DailyGauge from "@/components/charts/DailyGauge";
@@ -155,7 +155,14 @@ export default function Page() {
                 >
                   <span className="group-hover:underline capitalize-first _flex _items-top gap-0">
                     <Icon className="h-[1.2rem] float-left mt-[0.15rem] ml-[-0.35rem] mr-[0.15rem]" />
-                    <span className="capitalize-first">{log.entry?.trim()}</span>
+                    {/* photo-only entries (S4) have no text: fall back to a placeholder so the row isn't blank */}
+                    <span className="capitalize-first">{log.entry?.trim() || "(photo)"}</span>
+                    {log.attachmentCount > 0 &&
+                      <Paperclip
+                        aria-label="Has attachments"
+                        className="inline h-[0.9rem] ml-[0.1rem] mt-[-0.15rem] opacity-40"
+                      />
+                    }
                   </span>
                   <div className="flex gap-1">
                     <span className="group-hover:underline opacity-40">

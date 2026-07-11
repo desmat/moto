@@ -75,6 +75,35 @@ test('a journal entry with a photo and no text can be saved, with the attachment
   await page.request.delete(`/api/vehicles/${vehicle.id}`);
 });
 
+// S5: the seeded attachment (attachment-smoketest, linked to the seeded "new tires" log
+// smoke-log-7) is a READ-ONLY fixture -- these specs only assert on it, never mutate or
+// delete it. Its url is a data-URL so nothing depends on a real Blob store. The dashboard
+// only shows the 5 newest entries and smoke-log-7 sits below that cut (plus parallel specs
+// add their own logs), so the list indicator is asserted on the Logs page instead.
+test('the seeded attachment shows a paperclip in the logs list and a thumbnail on the detail page', async ({ page }) => {
+  await page.goto('/logs');
+
+  // the seeded "new tires" row carries the attachment indicator out of the box...
+  const rowWithAttachment = page.locator('a[href="/logs/smoke-log-7"]');
+  await expect(rowWithAttachment).toBeVisible();
+  await expect(rowWithAttachment.getByLabel('Has attachments')).toBeVisible();
+
+  // ...and a seeded row without attachments doesn't
+  const rowWithout = page.locator('a[href="/logs/smoke-log-3"]');
+  await expect(rowWithout).toBeVisible();
+  await expect(rowWithout.getByLabel('Has attachments')).toHaveCount(0);
+
+  // the detail page renders the image as a thumbnail wrapped in a new-tab link to the
+  // full-size url
+  await page.goto('/logs/smoke-log-7');
+  const thumbnail = page.getByAltText('new-tires.png');
+  await expect(thumbnail).toBeVisible();
+  await expect(thumbnail).toHaveAttribute('src', /^data:image\/png/);
+
+  const link = page.locator('a[target="_blank"]', { has: thumbnail });
+  await expect(link).toHaveAttribute('href', /^data:image\/png/);
+});
+
 test('removing a pending attachment deletes its record and disables Save again', async ({ page }) => {
   const vehicleRes = await page.request.post('/api/vehicles', { data: { vehicle: testVehicle } });
   const { vehicle } = await vehicleRes.json();

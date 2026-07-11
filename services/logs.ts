@@ -1,4 +1,5 @@
 import moment from "moment";
+import { deleteAttachment, getAttachments } from "./attachments";
 import { createStore } from "./stores";
 import { Log, LogTypeMileage } from "@/types/Log";
 import { SessionUser } from "@/types/User";
@@ -55,6 +56,15 @@ export async function saveLog(data: any, user: SessionUser): Promise<Log | undef
 
 export async function deleteLog(id: string): Promise<Log | undefined> {
   console.log("services.logs.deleteLog", { id });
+
+  // cascade: a log's attachments (records + blobs) go with it; done here in the service
+  // layer so every deletion path gets it. deleteAttachment's blob deletion is already
+  // best-effort, so a fake/missing blob can't block the log delete.
+  const attachments = await getAttachments({ log: id });
+
+  for (const attachment of attachments || []) {
+    await deleteAttachment(attachment.id);
+  }
 
   return store.logs.delete(id);
 }

@@ -1,7 +1,7 @@
 import { searchParamsToMap } from '@desmat/utils';
 import { NextRequest, NextResponse } from 'next/server'
 import trackEvent from '@/lib/trackEventServer';
-import { getAttachment, saveAttachment } from '@/services/attachments';
+import { getAttachment, getAttachments, saveAttachment } from '@/services/attachments';
 import { getLogs, saveLog } from '@/services/logs';
 import { currentUser } from '@/services/users';
 import { getVehicle } from '@/services/vehicles';
@@ -28,7 +28,23 @@ export async function GET(request: NextRequest, params?: any) {
     user: user.id,
   });
 
-  return NextResponse.json({ logs, count, offset });
+  // merge a computed attachmentCount onto each log (response-only field, deliberately
+  // not part of types/Log.ts's stored shape) -- one lookup over the user's attachments
+  // grouped by logId, rather than N+1 per-log queries
+  const attachments = await getAttachments({ user: user.id });
+  const attachmentCounts: Record<string, number> = {};
+  for (const attachment of attachments || []) {
+    if (attachment.logId) {
+      attachmentCounts[attachment.logId] = (attachmentCounts[attachment.logId] || 0) + 1;
+    }
+  }
+
+  const logsWithCounts = (logs || []).map((log: any) => ({
+    ...log,
+    attachmentCount: attachmentCounts[log.id] || 0,
+  }));
+
+  return NextResponse.json({ logs: logsWithCounts, count, offset });
 }
 
 export async function POST(request: NextRequest) {

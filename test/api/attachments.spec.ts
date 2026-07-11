@@ -242,6 +242,54 @@ test('POST /api/logs never re-links an attachment already linked to another log'
   await request.delete(`/api/vehicles/${vehicle.id}`);
 });
 
+test('GET /api/logs merges attachmentCount and DELETE /api/logs cascades to attachments', async ({ request }) => {
+  const vehicleRes = await request.post('/api/vehicles', { data: { vehicle: testVehicle } });
+  const { vehicle } = await vehicleRes.json();
+  expect(vehicle?.id).toBeTruthy();
+
+  // one log with an attachment, one without
+  const withLogRes = await request.post('/api/logs', {
+    data: { log: { vehicleId: vehicle.id, type: 'journal', entry: 'entry with an attachment count' } },
+  });
+  const { log: withLog } = await withLogRes.json();
+  const withoutLogRes = await request.post('/api/logs', {
+    data: { log: { vehicleId: vehicle.id, type: 'journal', entry: 'entry without attachments' } },
+  });
+  const { log: withoutLog } = await withoutLogRes.json();
+  expect(withLog?.id).toBeTruthy();
+  expect(withoutLog?.id).toBeTruthy();
+
+  const attachmentRes = await request.post('/api/attachments', {
+    data: { attachment: { ...testAttachment('count'), logId: withLog.id } },
+  });
+  const { attachment } = await attachmentRes.json();
+  expect(attachment?.id).toBeTruthy();
+
+  // the logs list carries the computed count without any per-log requests
+  const listRes = await request.get('/api/logs');
+  expect(listRes.ok()).toBeTruthy();
+  const { logs } = await listRes.json();
+  const listedWith = logs.find((l: any) => l.id == withLog.id);
+  const listedWithout = logs.find((l: any) => l.id == withoutLog.id);
+  expect(listedWith?.attachmentCount).toBe(1);
+  expect(listedWithout?.attachmentCount || 0).toBe(0);
+
+  // deleting the log cascades to its attachments (record gone; blob deletion is
+  // best-effort against the fake pathname)
+  const deleteRes = await request.delete(`/api/logs/${withLog.id}`);
+  expect(deleteRes.ok()).toBeTruthy();
+
+  const afterRes = await request.get(`/api/attachments?log=${withLog.id}`);
+  const { attachments: afterAttachments } = await afterRes.json();
+  expect(afterAttachments).toEqual([]);
+
+  const goneRes = await request.get(`/api/attachments/${attachment.id}`);
+  expect(goneRes.status()).toBe(404);
+
+  await request.delete(`/api/logs/${withoutLog.id}`);
+  await request.delete(`/api/vehicles/${vehicle.id}`);
+});
+
 test('attachment routes 404 for a missing id', async ({ request }) => {
   const missingGetRes = await request.get('/api/attachments/does-not-exist');
   expect(missingGetRes.status()).toBe(404);
