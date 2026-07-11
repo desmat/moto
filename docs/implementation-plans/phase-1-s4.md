@@ -16,7 +16,7 @@ Story: [phase-1.md](../phase-1.md) § S4. Depends on S2 + S3. Unblocks S5, S6.
 - New state: `attachments: { id, url, contentType, filename, status: "uploading" | "ready" | "error" }[]`, reset in the existing `useEffect` on open.
 - New prop: none — but `onSubmit`'s payload type gains `attachmentIds: string[]`.
 - UI, below the entry field: a row of thumbnails (images: `<img>` from `url`; PDFs: filename chip with a file icon), each with an ✕ remove button and an uploading spinner (`LoaderIcon` + `animate-spin`, per `setup-vehicle-dialog.tsx`), plus an "Add photo / file" `Button variant="outline"` (Paperclip icon from `lucide-react`) triggering a hidden `<input type="file" accept="image/*,application/pdf" multiple>`.
-- On file pick (per file): append `{ status: "uploading" }` entry → `uploadFile(file, user.id)` (`lib/upload.ts`; internal user id via `useUser()` — the dialog doesn't currently import it, add it) → POST `/api/attachments` via `useAttachment().add` → update entry to `ready` with the record id. Failure → `error` state on the chip with retry/remove.
+- On file pick (per file): append `{ status: "uploading" }` entry → `uploadFile(file, userId)` (`lib/upload.ts`; the **internal** user id via `useUserRecord().user.id` — **not** `useUser()`, whose id is the auth provider's and won't match the `moto/{currentUser().id}/` prefix the upload route enforces for real Clerk users; the dialog doesn't currently import it, add it) → POST `/api/attachments` via `useAttachment().add` → update entry to `ready` with the record id. Failure → `error` state on the chip with retry/remove.
 - Remove click: `useAttachment().delete(id)`, drop from state.
 - `canSubmit`:
   ```

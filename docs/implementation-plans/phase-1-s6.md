@@ -44,7 +44,7 @@ Mileage-mode additions (on top of S4's attachment support):
 ### Tests
 
 - `test/api/odometer.spec.ts`: create attachment record (fake image `contentType: "image/jpeg"`, prefix-valid pathname) → POST route → canned `{ reading: 12345, ... }` (AI_MOCK). Missing attachment → 404; non-image (`application/pdf`) → 400. (Always-authenticated test server, so 403 is design-review-only, per `ownership.spec.ts`'s standing note.)
-- e2e (`BLOB_MOCK` + `AI_MOCK` + memory store): Record → Current Mileage → `setInputFiles(test/fixtures/odometer.jpg)` → odometer field becomes `12345` with the ✨ hint → Save → entry in list; vehicle mileage updated (assert via `/api/vehicles/<id>`). Lower-than-current scenario: seeded CB500X has `mileage: 18250` and mock reads 12345 → the two-tap "Save anyway" path is exactly what this fixture exercises — assert the warning appears, second tap saves.
+- e2e (`BLOB_MOCK` + `AI_MOCK` + memory store): **create its own vehicle via the API first** (per AGENTS.md's test-isolation convention — do not mutate the seeded CB500X; parallel specs share one in-memory store and Phase 3 plans assert exact seed arithmetic on that bike). POST a vehicle with a known `mileage` **greater than the mock reading of 12345** (e.g. `mileage: 18250`, mirroring the old CB500X value) so the lower-than-current path is reachable, then select it in the dialog's vehicle picker. Scenario A: Record → Current Mileage → `setInputFiles(test/fixtures/odometer.jpg)` → odometer field becomes `12345` with the ✨ hint → Save → entry in list; vehicle mileage updated (assert via `/api/vehicles/<id>`). Scenario B (same freshly-created vehicle, `mileage: 18250` > 12345): the two-tap "Save anyway" path — assert the warning appears, second tap saves.
 
 ## Steps
 

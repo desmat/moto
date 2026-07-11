@@ -6,7 +6,7 @@ Story: [phase-1.md](../phase-1.md) § S3. Depends on S2 (`Attachment` entity). U
 
 - **Client → Blob direct** via `@vercel/blob/client`'s token-exchange flow (`handleUpload` server-side, `upload()` client-side). Files never pass through a Next.js function — phone photos are multi-MB and serverless bodies cap at ~4.5MB on Vercel.
 - **Single record-creation path — no `onUploadCompleted`.** Vercel's completion webhook can't reach localhost, so it can't be the (or even *a*) source of truth without an idempotency dance. Instead the client POSTs `/api/attachments` (S2) right after `upload()` resolves — authenticated, prefix-validated, idempotent by `pathname`. Prod and dev behave identically. Accepted risk: client dies between upload and POST → orphaned blob (already the deferred-cleanup bucket).
-- **Tenant prefix enforced at token time**: pathnames must be `moto/{internal user id}/…`. The client knows its internal id from `useUser()`; the server independently verifies against `currentUser()`.
+- **Tenant prefix enforced at token time**: pathnames must be `moto/{internal user id}/…`. The client builds the prefix from its **internal** id — `useUserRecord().user.id`, **not** `useUser()` (which is the auth provider's session id, a Clerk `user_…` in prod; it coincides with the internal id only under mock-auth/impersonation, so a `useUser()`-built prefix passes tests but is rejected at token time for every real Clerk user). The server-side `onBeforeGenerateToken` check against `currentUser().id` is the actual security boundary; the client-built prefix must match it, and the SDK flow gives the client no way to bypass that check.
 - **`BLOB_MOCK=true` for tests**: the client utility short-circuits to a fake result (no network, no token) so Playwright runs neither need nor pollute the real Blob store. This var is read in **client** code → per the AGENTS.md footgun it must be whitelisted by exact name in `next.config.mjs`'s `env` block (the documented pattern; not a `NEXT_PUBLIC_` rename).
 
 ## Files
@@ -38,9 +38,16 @@ import { upload } from "@vercel/blob/client";
 export type UploadedBlob = { url: string, pathname: string, contentType: string, size: number, filename: string };
 
 export async function uploadFile(file: File, userId: string): Promise<UploadedBlob> {
+  // userId is the INTERNAL short-uuid (useUserRecord().user.id), matching currentUser().id
+  // the upload route enforces — never the auth-provider id from useUser().
   if (process.env.BLOB_MOCK == "true") {
-    // deterministic fake: pathname `moto/${userId}/mock-${file.name}`, url a data-URL of the
-    // file (small test fixtures only) — flows through the normal S2 record-creation path
+    // fake result — must mirror the real flow's addRandomSuffix, i.e. a UNIQUE pathname per
+    // call: `moto/${userId}/mock-${Date.now()}-${rand}-${file.name}`. A deterministic path
+    // (`mock-${file.name}`) collides across specs: the attachments POST is idempotent-by-pathname
+    // and S4's linking guard won't re-link, so the 2nd spec to upload a shared fixture
+    // (S4 + S6 both use test/fixtures/odometer.jpg) silently gets the 1st spec's already-linked
+    // record and ends up with no attachment on its log. url = a data-URL of the file (small
+    // fixtures only) — flows through the normal S2 record-creation path.
   }
   const result = await upload(`moto/${userId}/${file.name}`, file, {
     access: "public",
