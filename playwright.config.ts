@@ -42,6 +42,8 @@ export default defineConfig({
       // developer's own .env.local (which is commonly set to "true" for local admin testing)
       IMPERSONATE_USER_IS_ADMIMN: 'false',
       STORE_TYPE: 'memory',
+      // canned AI responses — tests must be deterministic and must not need/spend a real key
+      AI_MOCK: 'true',
     },
   },
 });
