@@ -6,6 +6,7 @@ import NotFound from "@/app/not-found";
 import JsonEditor from "@/components/json-editor";
 import SetupVehicleDialog from "@/components/setup-vehicle-dialog";
 import { Button } from "@/components/ui/button";
+import VehicleDocuments from "@/components/vehicle-documents";
 import { useVehicle } from "@/hooks/use-vehicle";
 
 export default function Page({
@@ -50,6 +51,9 @@ export default function Page({
         <SetupVehicleDialog onSubmit={addVehicle}>
           <Button variant="outline">Add another vehicle</Button>
         </SetupVehicleDialog>
+      }
+      {vehicle &&
+        <VehicleDocuments vehicleId={id} />
       }
       <JsonEditor
         title="Vehicle"

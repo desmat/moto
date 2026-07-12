@@ -4,6 +4,7 @@ import { User } from "../../types/User";
 import { Vehicle } from "../../types/Vehicle";
 import { Log } from "../../types/Log";
 import { Attachment } from "../../types/Attachment";
+import { Document } from "../../types/Document";
 import { storeConfigs, StoreEntityName } from "./config";
 
 // Keep in sync with playwright.config.ts's IMPERSONATE_USER_ID -- vehicles/logs are
@@ -111,6 +112,9 @@ function buildStore({ debug }: { debug?: boolean }) {
     vehicles: new MemoryStore<Vehicle>({ ...storeConfigs.vehicles, debug, seed: seed.vehicles }),
     logs: new MemoryStore<Log>({ ...storeConfigs.logs, debug, seed: buildLogSeeds() }),
     attachments: new MemoryStore<Attachment>({ ...storeConfigs.attachments, debug, seed: seed.attachments }),
+    // no seeded documents on purpose: a seeded "ready" doc would also need seeded mock
+    // vectors (not worth the coupling); S9's spec creates its own fixture document
+    documents: new MemoryStore<Document>({ ...storeConfigs.documents, debug, seed: seed.documents }),
   };
 }
 
