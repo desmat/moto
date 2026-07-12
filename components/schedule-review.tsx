@@ -1,6 +1,6 @@
 'use client'
 import { sortBy } from "@desmat/utils"
-import { LoaderIcon } from "lucide-react"
+import { Check, Copy, LoaderIcon } from "lucide-react"
 import { useState } from "react"
 import ExtractedRows, { ExtractedRowsColumn } from "@/components/extracted-rows"
 import { Button } from "@/components/ui/button"
@@ -27,6 +27,26 @@ const columns: ExtractedRowsColumn[] = [
 
 // local-rows editor for one schedule; parent keys it by schedule.id so a different
 // schedule (e.g. a fresh extraction) resets the edit state
+// TEMPORARY (seed-data workflow, remove once enough real manuals have been captured):
+// copies a confirmed schedule's `items` array as pretty JSON, ready to paste straight
+// into services/stores/memory.ts's scheduleSeeds placeholder for that vehicle.
+function CopyScheduleJsonButton({ items }: { items: any[] }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(JSON.stringify(items, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Button variant="outline" size="sm" onClick={handleCopy}>
+      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      {copied ? "Copied" : "Copy schedule JSON"}
+    </Button>
+  );
+}
+
 function ScheduleEditor({ schedule, saveLabel, saving, onSave, onDiscard, discardLabel }: {
   schedule: MaintenanceSchedule,
   saveLabel: string,
@@ -130,9 +150,12 @@ export default function ScheduleReview({ vehicleId }: { vehicleId: string }) {
               {documentTitle(confirmed) ? ` from ${documentTitle(confirmed)}` : ""}
             </span>
             {!editingConfirmed &&
-              <Button variant="outline" size="sm" className="ml-auto" onClick={() => setEditingConfirmed(true)}>
-                Edit
-              </Button>
+              <div className="ml-auto flex flex-row gap-2">
+                <CopyScheduleJsonButton items={confirmed.items || []} />
+                <Button variant="outline" size="sm" onClick={() => setEditingConfirmed(true)}>
+                  Edit
+                </Button>
+              </div>
             }
           </div>
           {editingConfirmed &&

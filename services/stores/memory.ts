@@ -14,6 +14,12 @@ import { storeConfigs, StoreEntityName } from "./config";
 export const smokeTestUserId = "user_smoketest";
 
 const smokeTestVehicleId = "vehicle-smoketest";
+// two more real bikes for the manual → schedule seeding pass (see scheduleSeeds below):
+// upload each one's real owner's manual through the app once, confirm the extracted
+// schedule, then use the vehicle page's temporary "Copy schedule JSON" button
+// (components/schedule-review.tsx) to paste the result into scheduleSeeds.
+const crf250rlVehicleId = "vehicle-crf250rl";
+const gsxr750VehicleId = "vehicle-gsxr750";
 
 // Hard-coded (rather than loaded from a file) so this module has no I/O: it needs to work
 // identically whether it's pulled in from a Node.js API route or from middleware.ts, which
@@ -52,6 +58,29 @@ const seed: Partial<Record<StoreEntityName, any[]>> = {
       model: "XT250",
       year: 2018,
       mileage: 9400,
+      modifications: [],
+    },
+    // added for the manual → schedule seeding pass (see scheduleSeeds below)
+    {
+      id: crf250rlVehicleId,
+      createdAt: 1700000001500,
+      userId: smokeTestUserId,
+      type: "motorcycle",
+      maker: "Honda",
+      model: "CRF250RL",
+      year: 2020,
+      mileage: 3200,
+      modifications: [],
+    },
+    {
+      id: gsxr750VehicleId,
+      createdAt: 1700000001600,
+      userId: smokeTestUserId,
+      type: "motorcycle",
+      maker: "Suzuki",
+      model: "GSX-R 750",
+      year: 2009,
+      mileage: 22500,
       modifications: [],
     },
   ],
@@ -105,6 +134,40 @@ function buildLogSeeds(): any[] {
   ];
 }
 
+// ---------------------------------------------------------------------------
+// TEMPORARY (S10 follow-up): real extracted-and-confirmed maintenance schedules,
+// pasted in by hand after running each bike's actual owner's manual through the real
+// pipeline (AI_MOCK=false). Workflow: upload the manual on the vehicle's page → wait
+// for the schedule review banner → correct/confirm it → click the confirmed summary's
+// "Copy schedule JSON" button (components/schedule-review.tsx, itself temporary) →
+// paste the array of ScheduleItem objects below for that bike. Once filled in, the
+// vehicle has real seed data instead of nothing; empty arrays are simply skipped (no
+// document/vector coupling to fake, same reasoning as the "no seeded documents" note
+// below). Remove this whole block (and the copy button) once enough seed data exists
+// and the mechanism is no longer needed.
+const scheduleSeeds: Record<string, any[]> = {
+  [crf250rlVehicleId]: [
+    // paste the CRF250RL's confirmed schedule items here
+  ],
+  [gsxr750VehicleId]: [
+    // paste the GSX-R750's confirmed schedule items here
+  ],
+};
+
+function buildScheduleSeeds(): any[] {
+  return Object.entries(scheduleSeeds)
+    .filter(([, items]) => items.length > 0)
+    .map(([vehicleId, items], i) => ({
+      id: `schedule-seed-${i}`,
+      createdAt: 1700000002500 + i,
+      userId: smokeTestUserId,
+      vehicleId,
+      source: "manual",
+      status: "confirmed",
+      items,
+    }));
+}
+
 function buildStore({ debug }: { debug?: boolean }) {
   debug && console.log(`services.stores.memory.create`);
 
@@ -116,9 +179,9 @@ function buildStore({ debug }: { debug?: boolean }) {
     // no seeded documents on purpose: a seeded "ready" doc would also need seeded mock
     // vectors (not worth the coupling); S9's spec creates its own fixture document
     documents: new MemoryStore<Document>({ ...storeConfigs.documents, debug, seed: seed.documents }),
-    // no seeded schedules on purpose (same reasoning as documents): S10's spec creates
-    // its own fixtures via the API
-    schedules: new MemoryStore<MaintenanceSchedule>({ ...storeConfigs.schedules, debug }),
+    // seeded only from scheduleSeeds above (empty until real manuals are copied in);
+    // S10's spec still creates its own fixtures via the API regardless
+    schedules: new MemoryStore<MaintenanceSchedule>({ ...storeConfigs.schedules, debug, seed: buildScheduleSeeds() }),
   };
 }
 
