@@ -1,3 +1,4 @@
 {
-  "odometer": { "odometer_digits_clearly_visible": true, "reading": 12345, "unit": "km", "confidence": "high" }
+  "odometer": { "odometer_digits_clearly_visible": true, "reading": 12345, "unit": "km", "confidence": "high" },
+  "pageTranscription": { "page_text_clearly_legible": true, "text": "Mock page transcription: check tire pressure weekly.\n\nKeep chain lubricated every 500 km." }
 }

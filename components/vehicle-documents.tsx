@@ -1,6 +1,6 @@
 'use client'
 import { sortBy } from "@desmat/utils"
-import { Check, FileText, LoaderIcon, Trash2, X } from "lucide-react"
+import { Check, FileText, LoaderIcon, RotateCw, Trash2, X } from "lucide-react"
 import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -13,9 +13,9 @@ import { Document } from "@/types/Document"
 // The vehicle page's Documents section (S8): upload a manual/document against the
 // vehicle (blob upload → attachment record → document record, riding the S2/S3 chain),
 // list the vehicle's documents with their ingestion status, delete (cascades to
-// vectors + attachment server-side).
-//
-// S9 wires the "ingest on upload" trigger + a retry button into this component.
+// vectors + attachment server-side). Ingestion (S9) kicks off automatically after the
+// document record is created; "error" rows get a Retry button (re-ingest is idempotent
+// server-side). Status badges update live via the hook's processing-status polling.
 
 // a picked file's lifecycle while the upload + record POSTs are in flight; on success
 // the row disappears in favor of the real document row from the refetched list
@@ -29,7 +29,7 @@ export default function VehicleDocuments({ vehicleId }: { vehicleId: string }) {
   const { user } = useUserRecord();
   // also exposes the whole user's attachments, keyed by id, to resolve row file URLs
   const { add: addAttachment, attachments } = useAttachment();
-  const { loaded, documents, add: addDocument, delete: deleteDocument } = useDocument({ vehicleId });
+  const { loaded, documents, add: addDocument, ingest: ingestDocument, delete: deleteDocument } = useDocument({ vehicleId });
   const [pending, setPending] = useState<PendingUpload[]>([]);
   // "manual" is the right default for PDFs; if the user hasn't explicitly picked a type,
   // non-PDF files (photos of a sticker, a scanned page, ...) fall back to "other"
@@ -57,12 +57,16 @@ export default function VehicleDocuments({ vehicleId }: { vehicleId: string }) {
       console.log("components.vehicle-documents.uploadPickedFile", { uploadedBlob, attachment });
 
       const isPdf = file.type == "application/pdf";
-      await addDocument({
+      const document = await addDocument({
         vehicleId,
         attachmentId: attachment.id,
         type: docTypeTouched ? docType : (isPdf ? "manual" : "other"),
         title: file.name,
       });
+
+      // fire-and-forget: the server runs the whole pipeline in-route and the hook's
+      // polling tracks the processing → ready | error transitions
+      document?.id && ingestDocument(document.id);
 
       setPending((previous) => previous.filter((p) => p.id != localId));
     } catch (error) {
@@ -133,12 +137,22 @@ export default function VehicleDocuments({ vehicleId }: { vehicleId: string }) {
                   </span>
                 }
                 {document.status == "error" &&
-                  <span
-                    className="text-destructive cursor-help"
-                    title={document.error || "processing failed"}
-                  >
-                    error
-                  </span>
+                  <>
+                    <span
+                      className="text-destructive cursor-help"
+                      title={document.error || "processing failed"}
+                    >
+                      error
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`Retry processing ${document.title}`}
+                      title="Retry processing"
+                      onClick={() => ingestDocument(document.id)}
+                    >
+                      <RotateCw className="h-4 w-4 opacity-60 hover:opacity-100" />
+                    </button>
+                  </>
                 }
               </span>
               <button
