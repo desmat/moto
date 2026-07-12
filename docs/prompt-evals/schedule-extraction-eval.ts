@@ -7,8 +7,10 @@
 // from the user's Blob store (pathname contains "CB500X") or ask the user, then run
 // from the repo root:
 //   MANUAL_PDF=/path/to/CB500X-manual.pdf AI_MOCK=false \
-//     npx tsx --tsconfig tsconfig.json docs/prompt-evals/schedule-extraction-eval.ts --prompt v8
-// (`--prompt v8` = the shipped prompt. Each REAL run reads the whole manual — ~$0.25,
+//     npx tsx --tsconfig tsconfig.json docs/prompt-evals/schedule-extraction-eval.ts --prompt shipped
+// (`--prompt shipped` = the service's SCHEDULE_PROMPT exactly as production sends it;
+// v1–v8 are the frozen tuning-history candidates.
+// Each REAL run reads the whole manual — ~$0.25,
 // 1-2 min. Raw results save to runs/ beside the PDF; re-score a cached run free with
 // `--from <path>.json`.) One run is a weak signal: ±3-5 rows of run-to-run variance is
 // normal at the default temperature (and temperature 0 is WORSE — see services/ai.ts);
@@ -519,8 +521,8 @@ function printTable(items: Item[]) {
     extracted = JSON.parse(fs.readFileSync(path.isAbsolute(fromFile) ? fromFile : path.join(SCRATCH, fromFile), "utf8"));
     console.log(`re-scoring cached run: ${fromFile}`);
   } else {
-    if (!promptName || !CANDIDATES[promptName]) {
-      console.error(`usage: --prompt <${Object.keys(CANDIDATES).join("|")}> | --from <runs/x.json>`);
+    if (!promptName || (promptName != "shipped" && !CANDIDATES[promptName])) {
+      console.error(`usage: --prompt <shipped|${Object.keys(CANDIDATES).join("|")}> | --from <runs/x.json>`);
       process.exit(1);
     }
     if (!PDF || !fs.existsSync(PDF)) {
@@ -529,7 +531,15 @@ function printTable(items: Item[]) {
     }
     const { CANONICAL_COMPONENT_KEYS, ScheduleItemActions } = await import(path.join(REPO, "types/MaintenanceSchedule.ts"));
     const { extractFromFile } = await import(path.join(REPO, "services/ai.ts"));
-    const { prompt, desc } = CANDIDATES[promptName];
+    // "shipped" scores exactly what production runs (the service's exported
+    // SCHEDULE_PROMPT), with the v8 schema descriptions (kept mirrored to the shipped
+    // scheduleSchema by hand).
+    const { prompt, desc } = promptName == "shipped"
+      ? {
+          prompt: (await import(path.join(REPO, "services/schedule-extraction.ts"))).SCHEDULE_PROMPT,
+          desc: DESC_V8,
+        }
+      : CANDIDATES[promptName];
     const finalPrompt = prompt.replace("{KEYS}", CANONICAL_COMPONENT_KEYS.join(", "));
     const schema = makeSchema(desc, CANONICAL_COMPONENT_KEYS, ScheduleItemActions);
     const buffer = new Uint8Array(fs.readFileSync(PDF));

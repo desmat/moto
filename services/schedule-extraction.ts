@@ -102,7 +102,19 @@ const scheduleSchema = {
 // run-to-run variance is real but greedy decoding is worse, so the sampling default
 // stays. Guidance stays generic ("tables like Honda's use…") so simpler list-style
 // manuals still extract fine.
-const SCHEDULE_PROMPT = `You are a strict transcriber extracting the PERIODIC MAINTENANCE schedule from a vehicle owner's manual. You only report maintenance items and intervals actually printed in the document — never estimate, infer from general knowledge, or invent a plausible schedule.
+//
+// A FOURTH negative result (S10c): appending vehicle identity ("this is the manual for
+// a 2019 Honda CB500X") plus a Honda-specific layout hint block MEASURABLY DEGRADED the
+// decode — km-interval accuracy fell from ~18-22/26 (plain prompt, incl. a same-day
+// control run) to 4-9/26, whether the context was appended after the prompt or
+// injected mid-prompt, with a systematic every-column→24000 misread. The Honda grid
+// knowledge this prompt teaches generically is the right amount of it; do not add
+// maker-conditional or vehicle-identity context here without beating the plain prompt
+// across multiple runs of docs/prompt-evals/schedule-extraction-eval.ts.
+//
+// Exported ONLY for that eval harness (--prompt shipped scores exactly this text);
+// production callers go through extractSchedule().
+export const SCHEDULE_PROMPT = `You are a strict transcriber extracting the PERIODIC MAINTENANCE schedule from a vehicle owner's manual. You only report maintenance items and intervals actually printed in the document — never estimate, infer from general knowledge, or invent a plausible schedule.
 
 First decide: does the document contain an actual periodic maintenance schedule table (or an equivalent structured list of components with service intervals)? Set schedule_table_found accordingly. If it is false, items MUST be an empty array — an empty result is the correct, expected answer for a document without a schedule; a fabricated schedule is the worst possible answer.
 
