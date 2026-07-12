@@ -119,6 +119,11 @@ export async function extractFromFile<T>({ buffer, filename, prompt, schemaName,
 
     const completion = await getClient().chat.completions.create({
       model: MODELS.vision,
+      // Deliberately DEFAULT temperature: temperature 0 was tried during S10b's prompt
+      // tuning to tame run-to-run variance and it collapsed the schedule-table decode
+      // (interval extraction fell from 22/26 rows to 4/26 — greedy decoding locked into
+      // a degenerate "no distance intervals" reading of the grid). Don't re-add it
+      // without re-running the eval in docs/prompt-evals/.
       messages: [
         {
           role: "user",
