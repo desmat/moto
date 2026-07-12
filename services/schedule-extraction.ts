@@ -207,6 +207,11 @@ export async function extractSchedule(document: Document, by: SessionUser): Prom
     prompt: SCHEDULE_PROMPT,
     schemaName: "manualSchedule",
     schema: scheduleSchema,
+    // per-feature model choice, chosen after a real-manual eval comparison
+    // (docs/prompt-evals/schedule-extraction-eval.ts --model gpt-5.6-sol --reasoning medium):
+    // reading a scanned maintenance grid benefits from real deliberation
+    model: "gpt-5.6-sol",
+    reasoningEffort: "medium",
   });
 
   const items = normalizeItems(extracted);

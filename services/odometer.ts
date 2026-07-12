@@ -64,5 +64,9 @@ export async function readOdometer(imageUrl: string): Promise<OdometerReading> {
     prompt: ODOMETER_PROMPT,
     schemaName: "odometer",
     schema: odometerSchema,
+    // per-feature model choice: reading digits off a dashboard photo is a narrow
+    // transcription task with no benefit from deliberation, so reasoning is off
+    model: "gpt-5.6-luna",
+    reasoningEffort: "none",
   });
 }

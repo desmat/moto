@@ -511,8 +511,10 @@ function printTable(items: Item[]) {
   const promptName = args.includes("--prompt") ? args[args.indexOf("--prompt") + 1] : undefined;
   const fromFile = args.includes("--from") ? args[args.indexOf("--from") + 1] : undefined;
   // model comparison: defaults to whatever services/ai.ts's extractFromFile defaults to
-  // (MODELS.vision, currently gpt-4o) when omitted — only meaningful with --prompt shipped
+  // (MODELS.vision) when omitted — only meaningful with --prompt shipped
   const modelOverride = args.includes("--model") ? args[args.indexOf("--model") + 1] : undefined;
+  // gpt-5.x only; see services/ai.ts's ReasoningEffort type
+  const reasoningEffort = args.includes("--reasoning") ? args[args.indexOf("--reasoning") + 1] : undefined;
 
   // env first (AI_MOCK=false must already be in process.env so dotenv won't override it)
   process.env.AI_MOCK = "false";
@@ -553,9 +555,9 @@ function printTable(items: Item[]) {
     const finalPrompt = prompt.replace("{KEYS}", CANONICAL_COMPONENT_KEYS.join(", "));
     const buffer = new Uint8Array(fs.readFileSync(PDF));
     const modelLabel = modelOverride || "gpt-4o(default)";
-    console.log(`REAL extraction call — prompt=${promptName}, model=${modelLabel}, pdf=${buffer.length} bytes`);
+    console.log(`REAL extraction call — prompt=${promptName}, model=${modelLabel}, reasoning=${reasoningEffort || "(default)"}, pdf=${buffer.length} bytes`);
     const t0 = Date.now();
-    extracted = await extractFromFile({ buffer, filename: "CB500X-manual.pdf", prompt: finalPrompt, schemaName: "manualSchedule", schema, model: modelOverride });
+    extracted = await extractFromFile({ buffer, filename: "CB500X-manual.pdf", prompt: finalPrompt, schemaName: "manualSchedule", schema, model: modelOverride, reasoningEffort: reasoningEffort as any });
     console.log(`done in ${((Date.now() - t0) / 1000).toFixed(1)}s — gate=${extracted.schedule_table_found}, raw items=${extracted.items?.length}`);
     const outDir = path.join(SCRATCH, "runs");
     fs.mkdirSync(outDir, { recursive: true });

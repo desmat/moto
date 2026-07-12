@@ -3,13 +3,25 @@ import path from "path";
 import OpenAI, { toFile } from "openai";
 
 // Single source of truth for model names — nothing else in the codebase names a model.
+// Per-feature overrides (odometer → gpt-5.6-luna/none, schedule extraction →
+// gpt-5.6-sol/medium) are passed by their callers via extractFromImage/extractFromFile's
+// optional `model`/`reasoningEffort` params; `vision` here is only the fallback default
+// for callers that don't override (e.g. services/documents.ts's page-transcription
+// fallback).
 const MODELS = {
   // vision-capable + supports structured outputs (response_format json_schema, strict)
-  vision: "gpt-4o",
+  vision: "gpt-5.6-terra",
   // 1536 dimensions — the Upstash Vector index must be created with cosine metric and
   // this exact dimension count (services/vector.ts assumes they match).
   embedding: "text-embedding-3-small",
 };
+
+// Chat Completions' reasoning_effort param (gpt-5.x family): verified against a live
+// call that the accepted values are 'none' | 'low' | 'medium' | 'high' | 'xhigh' — wider
+// than the installed openai SDK's (4.104.0) shipped type (Shared.ReasoningEffort is
+// typed 'low'|'medium'|'high'|null, predating 'none'/'xhigh'), so this is typed by hand
+// rather than imported from the SDK.
+export type ReasoningEffort = "none" | "low" | "medium" | "high" | "xhigh";
 
 // Lazily constructed so importing this module without OPENAI_API_KEY set (builds,
 // `npm run admin`, Edge bundling) doesn't throw — only actually calling it does.
@@ -41,13 +53,15 @@ function loadMocks(): Record<string, any> {
   return mocks!;
 }
 
-export async function extractFromImage<T>({ imageUrl, prompt, schemaName, schema }: {
+export async function extractFromImage<T>({ imageUrl, prompt, schemaName, schema, model, reasoningEffort }: {
   imageUrl: string,   // blob URL (public-but-unguessable) — passed straight to OpenAI, no re-download
   prompt: string,
   schemaName: string, // doubles as the json_schema name and the MOCKS key
   schema: Record<string, unknown>, // plain JSON Schema (deliberately not zod — not a dependency)
+  model?: string,               // defaults to MODELS.vision; per-feature override (e.g. odometer → gpt-5.6-luna)
+  reasoningEffort?: ReasoningEffort, // gpt-5.x only; omit for models that don't support it
 }): Promise<T> {
-  console.log("services.ai.extractFromImage", { schemaName, imageUrl });
+  console.log("services.ai.extractFromImage", { schemaName, imageUrl, model: model || MODELS.vision, reasoningEffort });
 
   if (mock()) {
     const mocks = loadMocks();
@@ -59,7 +73,8 @@ export async function extractFromImage<T>({ imageUrl, prompt, schemaName, schema
 
   try {
     const completion = await getClient().chat.completions.create({
-      model: MODELS.vision,
+      model: model || MODELS.vision,
+      ...(reasoningEffort && { reasoning_effort: reasoningEffort as any }),
       messages: [
         {
           role: "user",
@@ -92,16 +107,17 @@ export async function extractFromImage<T>({ imageUrl, prompt, schemaName, schema
 // the uploaded file in a `finally` — it's a transient input, not something to accumulate
 // in the org's file storage. This is the one deliberate full-document AI spend in the
 // app (schedule tables in manuals mangle as raw text extraction).
-export async function extractFromFile<T>({ buffer, filename, prompt, schemaName, schema, model }: {
+export async function extractFromFile<T>({ buffer, filename, prompt, schemaName, schema, model, reasoningEffort }: {
   buffer: Uint8Array, // the file's bytes (already fetched — blob URLs may be data: URLs under BLOB_MOCK)
   filename: string,   // OpenAI uses the extension to sniff the file type — keep it accurate
   prompt: string,
   schemaName: string, // doubles as the json_schema name and the ai-mocks.json key
   schema: Record<string, unknown>, // plain JSON Schema (deliberately not zod — not a dependency)
-  model?: string,      // defaults to MODELS.vision; override is for docs/prompt-evals/
-                       // model comparisons only — production callers should not pass this
+  model?: string,      // defaults to MODELS.vision; per-feature override (e.g. schedule
+                       // extraction → gpt-5.6-sol) and docs/prompt-evals/ comparisons
+  reasoningEffort?: ReasoningEffort, // gpt-5.x only; omit for models that don't support it
 }): Promise<T> {
-  console.log("services.ai.extractFromFile", { schemaName, filename, size: buffer.length, model: model || MODELS.vision });
+  console.log("services.ai.extractFromFile", { schemaName, filename, size: buffer.length, model: model || MODELS.vision, reasoningEffort });
 
   if (mock()) {
     const mocks = loadMocks();
@@ -121,11 +137,13 @@ export async function extractFromFile<T>({ buffer, filename, prompt, schemaName,
 
     const completion = await getClient().chat.completions.create({
       model: model || MODELS.vision,
+      ...(reasoningEffort && { reasoning_effort: reasoningEffort as any }),
       // Deliberately DEFAULT temperature: temperature 0 was tried during S10b's prompt
-      // tuning to tame run-to-run variance and it collapsed the schedule-table decode
-      // (interval extraction fell from 22/26 rows to 4/26 — greedy decoding locked into
-      // a degenerate "no distance intervals" reading of the grid). Don't re-add it
-      // without re-running the eval in docs/prompt-evals/.
+      // tuning (on gpt-4o) to tame run-to-run variance and it collapsed the
+      // schedule-table decode (interval extraction fell from 22/26 rows to 4/26 —
+      // greedy decoding locked into a degenerate "no distance intervals" reading of the
+      // grid). Don't re-add it without re-running the eval in docs/prompt-evals/.
+      // reasoning_effort is the equivalent lever for gpt-5.x models — use that instead.
       messages: [
         {
           role: "user",
