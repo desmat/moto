@@ -36,7 +36,9 @@ type ExtractedSchedule = {
 // `key` is a plain string, not an enum: strict mode forbids interpolating a dynamic
 // vocabulary as an enum without freezing it forever, so CANONICAL_COMPONENT_KEYS is
 // prompt guidance + server-side slugify/validation instead (normalizeItems below).
-const scheduleSchema = {
+// exported for docs/prompt-evals/schedule-extraction-eval.ts (model-comparison runs
+// need the real schema, not just the real prompt)
+export const scheduleSchema = {
   type: "object",
   properties: {
     schedule_table_found: {

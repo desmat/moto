@@ -8,14 +8,17 @@
 // from the repo root:
 //   MANUAL_PDF=/path/to/CB500X-manual.pdf AI_MOCK=false \
 //     npx tsx --tsconfig tsconfig.json docs/prompt-evals/schedule-extraction-eval.ts --prompt shipped
-// (`--prompt shipped` = the service's SCHEDULE_PROMPT exactly as production sends it;
-// v1–v8 are the frozen tuning-history candidates.
+// (`--prompt shipped` = the service's SCHEDULE_PROMPT + scheduleSchema exactly as
+// production sends them; v1–v8 are the frozen tuning-history candidates.
+// Add `--model <id>` to compare a different chat-completions model against the shipped
+// prompt (defaults to whatever extractFromFile defaults to, currently gpt-4o — only
+// meaningful with `--prompt shipped`, since only that path uses the real schema/prompt).
 // Each REAL run reads the whole manual — ~$0.25,
-// 1-2 min. Raw results save to runs/ beside the PDF; re-score a cached run free with
-// `--from <path>.json`.) One run is a weak signal: ±3-5 rows of run-to-run variance is
-// normal at the default temperature (and temperature 0 is WORSE — see services/ai.ts);
-// prefer 2-3 runs when comparing prompts. History: v1 (naive) 7/26 interval decode,
-// v8 (shipped) 22/26.
+// 1-2 min. Raw results save to runs/ beside the PDF (filename includes the model); re-
+// score a cached run free with `--from <path>.json`.) One run is a weak signal: ±3-5
+// rows of run-to-run variance is normal at the default temperature (and temperature 0 is
+// WORSE — see services/ai.ts); prefer 2-3 runs when comparing. History: v1 (naive) 7/26
+// interval decode, v8/shipped on gpt-4o 18-22/26 across runs.
 import fs from "fs";
 import path from "path";
 
@@ -507,6 +510,9 @@ function printTable(items: Item[]) {
   const args = process.argv.slice(2);
   const promptName = args.includes("--prompt") ? args[args.indexOf("--prompt") + 1] : undefined;
   const fromFile = args.includes("--from") ? args[args.indexOf("--from") + 1] : undefined;
+  // model comparison: defaults to whatever services/ai.ts's extractFromFile defaults to
+  // (MODELS.vision, currently gpt-4o) when omitted — only meaningful with --prompt shipped
+  const modelOverride = args.includes("--model") ? args[args.indexOf("--model") + 1] : undefined;
 
   // env first (AI_MOCK=false must already be in process.env so dotenv won't override it)
   process.env.AI_MOCK = "false";
@@ -531,25 +537,29 @@ function printTable(items: Item[]) {
     }
     const { CANONICAL_COMPONENT_KEYS, ScheduleItemActions } = await import(path.join(REPO, "types/MaintenanceSchedule.ts"));
     const { extractFromFile } = await import(path.join(REPO, "services/ai.ts"));
-    // "shipped" scores exactly what production runs (the service's exported
-    // SCHEDULE_PROMPT), with the v8 schema descriptions (kept mirrored to the shipped
-    // scheduleSchema by hand).
-    const { prompt, desc } = promptName == "shipped"
-      ? {
-          prompt: (await import(path.join(REPO, "services/schedule-extraction.ts"))).SCHEDULE_PROMPT,
-          desc: DESC_V8,
-        }
-      : CANDIDATES[promptName];
+    // "shipped" scores exactly what production sends: the service's exported
+    // SCHEDULE_PROMPT + its exported scheduleSchema (the real schema object, not a
+    // hand-mirrored copy) — this is what makes --model comparisons meaningful. v1-v8
+    // are frozen tuning-history candidates and still use their recorded desc/makeSchema.
+    const { prompt, schema } = promptName == "shipped"
+      ? await (async () => {
+          const svc = await import(path.join(REPO, "services/schedule-extraction.ts"));
+          return { prompt: svc.SCHEDULE_PROMPT, schema: svc.scheduleSchema };
+        })()
+      : (() => {
+          const { prompt, desc } = CANDIDATES[promptName];
+          return { prompt, schema: makeSchema(desc, CANONICAL_COMPONENT_KEYS, ScheduleItemActions) };
+        })();
     const finalPrompt = prompt.replace("{KEYS}", CANONICAL_COMPONENT_KEYS.join(", "));
-    const schema = makeSchema(desc, CANONICAL_COMPONENT_KEYS, ScheduleItemActions);
     const buffer = new Uint8Array(fs.readFileSync(PDF));
-    console.log(`REAL extraction call — prompt=${promptName}, pdf=${buffer.length} bytes`);
+    const modelLabel = modelOverride || "gpt-4o(default)";
+    console.log(`REAL extraction call — prompt=${promptName}, model=${modelLabel}, pdf=${buffer.length} bytes`);
     const t0 = Date.now();
-    extracted = await extractFromFile({ buffer, filename: "CB500X-manual.pdf", prompt: finalPrompt, schemaName: "manualSchedule", schema });
+    extracted = await extractFromFile({ buffer, filename: "CB500X-manual.pdf", prompt: finalPrompt, schemaName: "manualSchedule", schema, model: modelOverride });
     console.log(`done in ${((Date.now() - t0) / 1000).toFixed(1)}s — gate=${extracted.schedule_table_found}, raw items=${extracted.items?.length}`);
     const outDir = path.join(SCRATCH, "runs");
     fs.mkdirSync(outDir, { recursive: true });
-    const outFile = path.join(outDir, `${promptName}-${Date.now()}.json`);
+    const outFile = path.join(outDir, `${promptName}-${modelOverride || "gpt4o"}-${Date.now()}.json`);
     fs.writeFileSync(outFile, JSON.stringify(extracted, null, 2));
     console.log(`raw output saved: ${outFile}`);
   }

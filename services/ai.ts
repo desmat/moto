@@ -92,14 +92,16 @@ export async function extractFromImage<T>({ imageUrl, prompt, schemaName, schema
 // the uploaded file in a `finally` — it's a transient input, not something to accumulate
 // in the org's file storage. This is the one deliberate full-document AI spend in the
 // app (schedule tables in manuals mangle as raw text extraction).
-export async function extractFromFile<T>({ buffer, filename, prompt, schemaName, schema }: {
+export async function extractFromFile<T>({ buffer, filename, prompt, schemaName, schema, model }: {
   buffer: Uint8Array, // the file's bytes (already fetched — blob URLs may be data: URLs under BLOB_MOCK)
   filename: string,   // OpenAI uses the extension to sniff the file type — keep it accurate
   prompt: string,
   schemaName: string, // doubles as the json_schema name and the ai-mocks.json key
   schema: Record<string, unknown>, // plain JSON Schema (deliberately not zod — not a dependency)
+  model?: string,      // defaults to MODELS.vision; override is for docs/prompt-evals/
+                       // model comparisons only — production callers should not pass this
 }): Promise<T> {
-  console.log("services.ai.extractFromFile", { schemaName, filename, size: buffer.length });
+  console.log("services.ai.extractFromFile", { schemaName, filename, size: buffer.length, model: model || MODELS.vision });
 
   if (mock()) {
     const mocks = loadMocks();
@@ -118,7 +120,7 @@ export async function extractFromFile<T>({ buffer, filename, prompt, schemaName,
     uploadedFileId = uploaded.id;
 
     const completion = await getClient().chat.completions.create({
-      model: MODELS.vision,
+      model: model || MODELS.vision,
       // Deliberately DEFAULT temperature: temperature 0 was tried during S10b's prompt
       // tuning to tame run-to-run variance and it collapsed the schedule-table decode
       // (interval extraction fell from 22/26 rows to 4/26 — greedy decoding locked into
