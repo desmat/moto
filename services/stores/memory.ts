@@ -5,6 +5,7 @@ import { Vehicle } from "../../types/Vehicle";
 import { Log } from "../../types/Log";
 import { Attachment } from "../../types/Attachment";
 import { Document } from "../../types/Document";
+import { MaintenanceSchedule } from "../../types/MaintenanceSchedule";
 import { storeConfigs, StoreEntityName } from "./config";
 
 // Keep in sync with playwright.config.ts's IMPERSONATE_USER_ID -- vehicles/logs are
@@ -115,6 +116,9 @@ function buildStore({ debug }: { debug?: boolean }) {
     // no seeded documents on purpose: a seeded "ready" doc would also need seeded mock
     // vectors (not worth the coupling); S9's spec creates its own fixture document
     documents: new MemoryStore<Document>({ ...storeConfigs.documents, debug, seed: seed.documents }),
+    // no seeded schedules on purpose (same reasoning as documents): S10's spec creates
+    // its own fixtures via the API
+    schedules: new MemoryStore<MaintenanceSchedule>({ ...storeConfigs.schedules, debug }),
   };
 }
 

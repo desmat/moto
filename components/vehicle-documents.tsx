@@ -1,11 +1,12 @@
 'use client'
 import { sortBy } from "@desmat/utils"
 import { Check, FileText, LoaderIcon, RotateCw, Trash2, X } from "lucide-react"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { useAttachment } from "@/hooks/use-attachment"
 import { useDocument } from "@/hooks/use-document"
+import { useSchedule } from "@/hooks/use-schedule"
 import { useUserRecord } from "@/hooks/use-user"
 import { uploadFile } from "@/lib/upload"
 import { Document } from "@/types/Document"
@@ -16,6 +17,13 @@ import { Document } from "@/types/Document"
 // vectors + attachment server-side). Ingestion (S9) kicks off automatically after the
 // document record is created; "error" rows get a Retry button (re-ingest is idempotent
 // server-side). Status badges update live via the hook's processing-status polling.
+//
+// S10 chains schedule extraction: when an ingest THIS component started (upload or
+// retry) settles as "ready" on a `type: "manual"` document, it POSTs
+// /api/documents/[id]/schedule once; the resulting proposed schedule surfaces in
+// schedule-review.tsx (the extract mutation invalidates the schedules query). Tracked
+// via a session-local set on purpose — an already-ready document rendered on page load
+// is never re-extracted.
 
 // a picked file's lifecycle while the upload + record POSTs are in flight; on success
 // the row disappears in favor of the real document row from the refetched list
@@ -30,7 +38,14 @@ export default function VehicleDocuments({ vehicleId }: { vehicleId: string }) {
   // also exposes the whole user's attachments, keyed by id, to resolve row file URLs
   const { add: addAttachment, attachments } = useAttachment();
   const { loaded, documents, add: addDocument, ingest: ingestDocument, delete: deleteDocument } = useDocument({ vehicleId });
+  const { extract: extractSchedule } = useSchedule({ vehicleId });
   const [pending, setPending] = useState<PendingUpload[]>([]);
+  // manual documents whose ingest this component kicked off and whose "ready" should
+  // trigger schedule extraction (see the S10 note above); ref, not state — mutating it
+  // must not rerender, the polling-driven `documents` updates do that
+  const awaitingExtraction = useRef<Set<string>>(new Set());
+  // documents with a schedule-extraction POST in flight (row shows "extracting schedule…")
+  const [extracting, setExtracting] = useState<Record<string, boolean>>({});
   // "manual" is the right default for PDFs; if the user hasn't explicitly picked a type,
   // non-PDF files (photos of a sticker, a scanned page, ...) fall back to "other"
   const [docType, setDocType] = useState<"manual" | "other">("manual");
@@ -40,6 +55,37 @@ export default function VehicleDocuments({ vehicleId }: { vehicleId: string }) {
   const sortedDocuments: Document[] = documents
     ? (Object.values(documents) as Document[]).sort(sortBy('createdAt'))
     : [];
+
+  const startIngest = (document: Document) => {
+    if (document.type == "manual") {
+      awaitingExtraction.current.add(document.id);
+    }
+    ingestDocument(document.id);
+  };
+
+  // watch the polled document list: an awaited ingest settling as "ready" fires the
+  // schedule extraction exactly once; settling as "error" just drops the wait
+  useEffect(() => {
+    if (!documents) return;
+
+    for (const id of Array.from(awaitingExtraction.current)) {
+      const document = (documents as Record<string, Document>)[id];
+      if (!document || document.status == "processing" || document.status == "uploaded") continue;
+
+      awaitingExtraction.current.delete(id);
+      if (document.status != "ready") continue;
+
+      setExtracting((previous) => ({ ...previous, [id]: true }));
+      extractSchedule(id)
+        // fire-and-forget: a failed extraction (including "no schedule found") only
+        // costs the review banner; the document itself is fine
+        .catch((error: any) => console.error("components.vehicle-documents: schedule extraction failed", { id, error }))
+        .finally(() => setExtracting((previous) => {
+          const { [id]: _done, ...rest } = previous;
+          return rest;
+        }));
+    }
+  }, [documents, extractSchedule]);
 
   const uploadPickedFile = async (file: File) => {
     const localId = `local-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
@@ -65,8 +111,9 @@ export default function VehicleDocuments({ vehicleId }: { vehicleId: string }) {
       });
 
       // fire-and-forget: the server runs the whole pipeline in-route and the hook's
-      // polling tracks the processing → ready | error transitions
-      document?.id && ingestDocument(document.id);
+      // polling tracks the processing → ready | error transitions (and, for manuals,
+      // "ready" chains into schedule extraction via the effect above)
+      document?.id && startIngest(document);
 
       setPending((previous) => previous.filter((p) => p.id != localId));
     } catch (error) {
@@ -136,6 +183,12 @@ export default function VehicleDocuments({ vehicleId }: { vehicleId: string }) {
                     ready
                   </span>
                 }
+                {extracting[document.id] &&
+                  <span className="flex flex-row items-center gap-1 text-muted-foreground">
+                    <LoaderIcon className="h-4 w-4 animate-spin" />
+                    extracting schedule…
+                  </span>
+                }
                 {document.status == "error" &&
                   <>
                     <span
@@ -148,7 +201,7 @@ export default function VehicleDocuments({ vehicleId }: { vehicleId: string }) {
                       type="button"
                       aria-label={`Retry processing ${document.title}`}
                       title="Retry processing"
-                      onClick={() => ingestDocument(document.id)}
+                      onClick={() => startIngest(document)}
                     >
                       <RotateCw className="h-4 w-4 opacity-60 hover:opacity-100" />
                     </button>

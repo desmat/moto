@@ -3,6 +3,7 @@ export type TrackingEventType =
   | "document-created" | "document-deleted" | "document-ingested" | "document-updated"
   | "log-created" | "log-deleted" | "log-updated"
   | "odometer-ocr"
+  | "schedule-created" | "schedule-deleted" | "schedule-extracted" | "schedule-updated"
   | "user-updated"
   | "vehicle-created" | "vehicle-deleted" | "vehicle-updated";
 

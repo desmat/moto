@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { use, useState } from "react";
 import NotFound from "@/app/not-found";
 import JsonEditor from "@/components/json-editor";
+import ScheduleReview from "@/components/schedule-review";
 import SetupVehicleDialog from "@/components/setup-vehicle-dialog";
 import { Button } from "@/components/ui/button";
 import VehicleDocuments from "@/components/vehicle-documents";
@@ -53,7 +54,10 @@ export default function Page({
         </SetupVehicleDialog>
       }
       {vehicle &&
-        <VehicleDocuments vehicleId={id} />
+        <>
+          <VehicleDocuments vehicleId={id} />
+          <ScheduleReview vehicleId={id} />
+        </>
       }
       <JsonEditor
         title="Vehicle"

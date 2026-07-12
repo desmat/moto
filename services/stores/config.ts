@@ -6,6 +6,7 @@ import { VehicleOptions } from "../../types/Vehicle";
 import { LogOptions } from "../../types/Log";
 import { AttachmentOptions } from "../../types/Attachment";
 import { DocumentOptions } from "../../types/Document";
+import { MaintenanceScheduleOptions } from "../../types/MaintenanceSchedule";
 
 export const storeConfigs = {
   users: { key: "MotoUser", options: UserOptions },
@@ -13,6 +14,7 @@ export const storeConfigs = {
   logs: { key: "MotoLog", options: LogOptions },
   attachments: { key: "MotoAttachment", options: AttachmentOptions },
   documents: { key: "MotoDocument", options: DocumentOptions },
+  schedules: { key: "MotoMaintenanceSchedule", options: MaintenanceScheduleOptions },
 } as const;
 
 export type StoreEntityName = keyof typeof storeConfigs;

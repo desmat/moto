@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 
 // Single source of truth for model names — nothing else in the codebase names a model.
 const MODELS = {
@@ -83,6 +83,71 @@ export async function extractFromImage<T>({ imageUrl, prompt, schemaName, schema
   } catch (err: any) {
     // wrap with context; routes turn thrown errors into 5xx JSON
     throw new Error(`services.ai.extractFromImage(${schemaName}): ${err.message}`);
+  }
+}
+
+// Whole-file extraction (S10): upload the file to the OpenAI Files API, reference it as
+// a `file` content part in a chat completion (verified against openai@4.104's types:
+// ChatCompletionContentPart.File is `{ type: "file", file: { file_id } }`), and delete
+// the uploaded file in a `finally` — it's a transient input, not something to accumulate
+// in the org's file storage. This is the one deliberate full-document AI spend in the
+// app (schedule tables in manuals mangle as raw text extraction).
+export async function extractFromFile<T>({ buffer, filename, prompt, schemaName, schema }: {
+  buffer: Uint8Array, // the file's bytes (already fetched — blob URLs may be data: URLs under BLOB_MOCK)
+  filename: string,   // OpenAI uses the extension to sniff the file type — keep it accurate
+  prompt: string,
+  schemaName: string, // doubles as the json_schema name and the ai-mocks.json key
+  schema: Record<string, unknown>, // plain JSON Schema (deliberately not zod — not a dependency)
+}): Promise<T> {
+  console.log("services.ai.extractFromFile", { schemaName, filename, size: buffer.length });
+
+  if (mock()) {
+    const mocks = loadMocks();
+    if (!(schemaName in mocks)) {
+      throw new Error(`services.ai.extractFromFile(${schemaName}): no mock registered in test/fixtures/ai-mocks.json (AI_MOCK=true)`);
+    }
+    return mocks[schemaName] as T;
+  }
+
+  let uploadedFileId: string | undefined;
+  try {
+    const uploaded = await getClient().files.create({
+      file: await toFile(buffer, filename),
+      purpose: "user_data",
+    });
+    uploadedFileId = uploaded.id;
+
+    const completion = await getClient().chat.completions.create({
+      model: MODELS.vision,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "file", file: { file_id: uploaded.id } },
+            { type: "text", text: prompt },
+          ],
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: schemaName, strict: true, schema },
+      },
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("empty response");
+    }
+    return JSON.parse(content) as T;
+  } catch (err: any) {
+    // wrap with context; routes turn thrown errors into 5xx JSON
+    throw new Error(`services.ai.extractFromFile(${schemaName}): ${err.message}`);
+  } finally {
+    if (uploadedFileId) {
+      // best-effort: a failed delete must not mask the real result/error
+      await getClient().files.del(uploadedFileId).catch((err) =>
+        console.error("services.ai.extractFromFile: failed to delete uploaded file", { uploadedFileId, err }));
+    }
   }
 }
 
