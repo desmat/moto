@@ -14,10 +14,7 @@ import { storeConfigs, StoreEntityName } from "./config";
 export const smokeTestUserId = "user_smoketest";
 
 const smokeTestVehicleId = "vehicle-smoketest";
-// two more real bikes for the manual → schedule seeding pass (see scheduleSeeds below):
-// upload each one's real owner's manual through the app once, confirm the extracted
-// schedule, then use the vehicle page's temporary "Copy schedule JSON" button
-// (components/schedule-review.tsx) to paste the result into scheduleSeeds.
+const smokeTestVehicle2Id = "vehicle-smoketest-2";
 const crf250rlVehicleId = "vehicle-crf250rl";
 const gsxr750VehicleId = "vehicle-gsxr750";
 
@@ -50,7 +47,7 @@ const seed: Partial<Record<StoreEntityName, any[]>> = {
       modifications: ["crash bars", "heated grips"],
     },
     {
-      id: "vehicle-smoketest-2",
+      id: smokeTestVehicle2Id,
       createdAt: 1700000001000,
       userId: smokeTestUserId,
       type: "motorcycle",
@@ -137,20 +134,676 @@ function buildLogSeeds(): any[] {
 // ---------------------------------------------------------------------------
 // TEMPORARY (S10 follow-up): real extracted-and-confirmed maintenance schedules,
 // pasted in by hand after running each bike's actual owner's manual through the real
-// pipeline (AI_MOCK=false). Workflow: upload the manual on the vehicle's page → wait
-// for the schedule review banner → correct/confirm it → click the confirmed summary's
-// "Copy schedule JSON" button (components/schedule-review.tsx, itself temporary) →
-// paste the array of ScheduleItem objects below for that bike. Once filled in, the
-// vehicle has real seed data instead of nothing; empty arrays are simply skipped (no
-// document/vector coupling to fake, same reasoning as the "no seeded documents" note
-// below). Remove this whole block (and the copy button) once enough seed data exists
-// and the mechanism is no longer needed.
+// pipeline (AI_MOCK=false). Remove this whole block (and the copy button) once enough 
+// seed data exists and the mechanism is no longer needed.
 const scheduleSeeds: Record<string, any[]> = {
-  [crf250rlVehicleId]: [
-    // paste the CRF250RL's confirmed schedule items here
+  [smokeTestVehicleId]: [
+    {
+      "key": "fuel-line",
+      "name": "Fuel Line",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "throttle",
+      "name": "Throttle Operation",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "air-filter",
+      "name": "Air Cleaner",
+      "action": "inspect",
+      "intervalMonths": 12,
+      "notes": "Service more frequently when riding in unusually wet or dusty areas."
+    },
+    {
+      "key": "crankcase-breather",
+      "name": "Crankcase Breather",
+      "action": "clean",
+      "intervalMonths": 12,
+      "notes": "Service more frequently when riding in rain or at full throttle."
+    },
+    {
+      "key": "spark-plugs",
+      "name": "Spark Plug",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "valve-clearance",
+      "name": "Valve Clearance",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "engine-oil",
+      "name": "Engine Oil",
+      "action": "replace",
+      "intervalKm": 12000,
+      "intervalMonths": 12,
+      "firstAtKm": 1000
+    },
+    {
+      "key": "oil-filter",
+      "name": "Engine Oil Filter",
+      "action": "replace",
+      "intervalKm": 12000,
+      "firstAtKm": 1000
+    },
+    {
+      "key": "engine-idle-speed",
+      "name": "Engine Idle Speed",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "coolant",
+      "name": "Radiator Coolant",
+      "action": "replace",
+      "intervalMonths": 36,
+      "notes": "3 Years; inspect every 12,000 km"
+    },
+    {
+      "key": "cooling-system",
+      "name": "Cooling System",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "secondary-air-supply-system",
+      "name": "Secondary Air Supply System",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "evaporative-emission-control-system",
+      "name": "Evaporative Emission Control System",
+      "action": "inspect",
+      "intervalMonths": 12,
+      "notes": "ED, KO type only."
+    },
+    {
+      "key": "chain",
+      "name": "Drive Chain",
+      "action": "lubricate",
+      "intervalKm": 1000,
+      "notes": "Every 1,000 km (600 mi)"
+    },
+    {
+      "key": "chain-slider",
+      "name": "Drive Chain Slider",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "brake-fluid",
+      "name": "Brake Fluid",
+      "action": "replace",
+      "intervalMonths": 24,
+      "notes": "2 Years; inspect every 12,000 km"
+    },
+    {
+      "key": "brake-pads-front",
+      "name": "Brake Pads Wear",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "brake-system",
+      "name": "Brake System",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "brakelight-switch",
+      "name": "Brakelight Switch",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "lights",
+      "name": "Lights/Horn",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "clutch",
+      "name": "Clutch System",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "side-stand",
+      "name": "Side Stand",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "suspension",
+      "name": "Suspension",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "nuts-bolts-fasteners",
+      "name": "Nuts, Bolts, Fasteners",
+      "action": "inspect",
+      "intervalMonths": 12
+    },
+    {
+      "key": "wheels",
+      "name": "Wheels/Tyres",
+      "action": "inspect",
+      "intervalMonths": 12,
+      "notes": "Service more frequently when riding in rain or at full throttle."
+    },
+    {
+      "key": "steering-bearings",
+      "name": "Steering Head Bearings",
+      "action": "inspect",
+      "intervalMonths": 12
+    }
   ],
-  [gsxr750VehicleId]: [
-    // paste the GSX-R750's confirmed schedule items here
+  [crf250rlVehicleId]: [
+    {
+      "action": "inspect",
+      "key": "fuel-line",
+      "name": "Fuel Line",
+      "intervalKm": 12800
+    },
+    {
+      "intervalKm": 12800,
+      "key": "throttle",
+      "name": "Throttle Operation",
+      "action": "inspect"
+    },
+    {
+      "action": "replace",
+      "intervalKm": 19200,
+      "key": "air-filter",
+      "name": "Air Cleaner",
+      "notes": ""
+    },
+    {
+      "notes": "",
+      "action": "clean",
+      "intervalKm": 6400,
+      "key": "crankcase-breather",
+      "name": "Crankcase Breather"
+    },
+    {
+      "action": "inspect",
+      "intervalKm": 25600,
+      "key": "spark-plugs",
+      "name": "Spark Plug"
+    },
+    {
+      "key": "spark-plugs",
+      "name": "Spark Plugs",
+      "action": "replace",
+      "intervalKm": 51200
+    },
+    {
+      "intervalKm": 25600,
+      "action": "inspect",
+      "key": "valve-clearance",
+      "name": "Valve Clearance"
+    },
+    {
+      "name": "Engine Oil",
+      "notes": "",
+      "action": "replace",
+      "firstAtKm": 1000,
+      "intervalKm": 12800,
+      "intervalMonths": 12,
+      "key": "engine-oil"
+    },
+    {
+      "action": "replace",
+      "firstAtKm": 1000,
+      "intervalKm": 25600,
+      "key": "oil-filter",
+      "name": "Engine Oil Filter"
+    },
+    {
+      "key": "engine-idle-speed",
+      "name": "Engine Idle Speed",
+      "intervalKm": 12800,
+      "action": "inspect"
+    },
+    {
+      "action": "replace",
+      "intervalMonths": 36,
+      "key": "coolant",
+      "name": "Radiator Coolant",
+      "notes": ""
+    },
+    {
+      "key": "coolant",
+      "name": "Radiator Coolant",
+      "action": "inspect",
+      "intervalKm": 12800
+    },
+    {
+      "action": "inspect",
+      "key": "cooling-system",
+      "name": "Cooling System",
+      "intervalKm": 12800
+    },
+    {
+      "action": "inspect",
+      "key": "secondary-air-system",
+      "name": "Secondary Air Supply System",
+      "intervalKm": 25600
+    },
+    {
+      "key": "evaporative-emission",
+      "name": "Evaporative Emission Control System",
+      "intervalKm": 25600,
+      "action": "inspect"
+    },
+    {
+      "key": "chain",
+      "name": "Drive Chain",
+      "intervalKm": 1000,
+      "action": "inspect"
+    },
+    {
+      "key": "chain",
+      "name": "Drive Chain",
+      "intervalKm": 1000,
+      "action": "lubricate"
+    },
+    {
+      "key": "chain-slide",
+      "name": "Drive Chain Slider",
+      "intervalKm": 6400,
+      "action": "inspect"
+    },
+    {
+      "key": "brake-fuild",
+      "name": "Brake Fluid",
+      "intervalKm": 6400,
+      "action": "inspect"
+    },
+    {
+      "key": "brake-fuild",
+      "name": "Brake Fluid",
+      "intervalMonths": 24,
+      "action": "replace"
+    },
+    {
+      "key": "brake-system",
+      "name": "Brake System",
+      "intervalKm": 12800,
+      "action": "inspect"
+    },
+    {
+      "key": "brake-light-switch",
+      "name": "Brake Light Switch",
+      "intervalKm": 12800,
+      "action": "inspect"
+    },
+    {
+      "key": "headlight-aim",
+      "name": "Headlight Aim",
+      "intervalKm": 12800,
+      "action": "inspect"
+    },
+    {
+      "key": "clutch",
+      "name": "Clutch System",
+      "intervalKm": 6400,
+      "action": "inspect"
+    },
+    {
+      "key": "side-stand",
+      "name": "Side Stand",
+      "intervalKm": 12800,
+      "action": "inspect"
+    },
+    {
+      "key": "suspension",
+      "name": "Suspension",
+      "intervalKm": 12800,
+      "action": "inspect"
+    },
+    {
+      "key": "spark-arrester",
+      "name": "Spark Arrester",
+      "intervalKm": 6400,
+      "action": "clean"
+    },
+    {
+      "key": "nut-bolts-fasteners",
+      "name": "Nuts, Botz, Fasteners",
+      "intervalKm": 12800,
+      "action": "inspect"
+    },
+    {
+      "key": "wheels-tires",
+      "name": "Wheels/Tires",
+      "intervalKm": 6400,
+      "action": "inspect"
+    },
+    {
+      "key": "steering-ead-bearings",
+      "name": "steering Head Bearings",
+      "intervalKm": 12800,
+      "action": "inspect"
+    }
+  ],
+  [smokeTestVehicle2Id]: [
+    {
+      "key": "fuel-line",
+      "name": "Fuel line",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check fuel hoses for cracks or damage. Replace if necessary."
+    },
+    {
+      "key": "spark-plugs",
+      "name": "Spark plug",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 12,
+      "firstAtKm": 1000,
+      "notes": "Check condition. Adjust gap and clean. Replace at 7000 mi (11000 km) or 12 months and thereafter every 6000 mi (10000 km) or 12 months."
+    },
+    {
+      "key": "spark-arrester",
+      "name": "Spark arrester",
+      "action": "clean",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000
+    },
+    {
+      "key": "valve-clearance",
+      "name": "Valve clearance",
+      "action": "inspect",
+      "intervalKm": 12000,
+      "intervalMonths": 12,
+      "firstAtKm": 1000,
+      "notes": "Check and adjust valve clearance when engine is cold."
+    },
+    {
+      "key": "crankcase-breather",
+      "name": "Crankcase breather system",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check breather hose for cracks or damage. Replace if necessary."
+    },
+    {
+      "key": "idle-speed",
+      "name": "Idle speed",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check and adjust engine idle speed."
+    },
+    {
+      "key": "exhaust-system",
+      "name": "Exhaust system",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "notes": "Check for leakage. Tighten if necessary. Replace gasket(s) if necessary."
+    },
+    {
+      "key": "evaporative-emission-control-system",
+      "name": "Evaporative emission control system",
+      "action": "inspect",
+      "intervalKm": 4000,
+      "intervalMonths": 24,
+      "notes": "For California only. Check control system for damage. Replace if necessary."
+    },
+    {
+      "key": "air-filter",
+      "name": "Air filter element",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check condition and for damage. Replace if necessary. Replace at 13000 mi (21000 km) and thereafter every 12000 mi (20000 km)."
+    },
+    {
+      "key": "clutch",
+      "name": "Clutch",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check operation. Adjust or replace cable."
+    },
+    {
+      "key": "front-brake",
+      "name": "Front brake",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check operation, fluid level, and for fluid leakage. Replace brake pads if necessary."
+    },
+    {
+      "key": "rear-brake",
+      "name": "Rear brake",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check operation, fluid level, and for fluid leakage. Replace brake pads if necessary."
+    },
+    {
+      "key": "brake-hoses",
+      "name": "Brake hose",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check for cracks or damage. Replace every 4 years."
+    },
+    {
+      "key": "wheels",
+      "name": "Wheels",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check runout, spoke tightness and for damage. Tighten spokes if necessary."
+    },
+    {
+      "key": "tires",
+      "name": "Tires",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check tread depth and for damage. Replace if necessary. Check air pressure. Correct if necessary."
+    },
+    {
+      "key": "wheel-bearings",
+      "name": "Wheel bearings",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check bearings for smooth operation. Replace if necessary."
+    },
+    {
+      "key": "swingarm-pivot-bushes",
+      "name": "Swingarm pivot bushes",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check bush assemblies for looseness. Lubricate with lithium-soap-based grease."
+    },
+    {
+      "key": "chain",
+      "name": "Drive chain",
+      "action": "inspect",
+      "intervalKm": 500,
+      "firstAtKm": 1000,
+      "notes": "Check chain slack, alignment and condition. Adjust and lubricate chain with a special O-ring chain lubricant thoroughly. Every 300 mi (500 km) and after washing the motorcycle or riding in the rain."
+    },
+    {
+      "key": "steering-bearings",
+      "name": "Steering bearings",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check bearing assemblies for looseness. Moderately repack with lithium-soap-based grease."
+    },
+    {
+      "key": "chassis-fasteners",
+      "name": "Chassis fasteners",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check all chassis fitting and fasteners. Correct if necessary."
+    },
+    {
+      "key": "brake-lever",
+      "name": "Brake lever pivot shaft",
+      "action": "lubricate",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Apply silicone grease lightly."
+    },
+    {
+      "key": "brake-pedal",
+      "name": "Brake pedal pivot shaft",
+      "action": "lubricate",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Apply lithium-soap-based grease lightly."
+    },
+    {
+      "key": "clutch-lever",
+      "name": "Clutch lever pivot shaft",
+      "action": "lubricate",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Apply lithium-soap-based grease lightly."
+    },
+    {
+      "key": "shift-pedal",
+      "name": "Shift pedal pivot shaft",
+      "action": "lubricate",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Apply lithium-soap-based grease lightly."
+    },
+    {
+      "key": "sidestand",
+      "name": "Sidestand pivot",
+      "action": "lubricate",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check operation. Apply lithium-soap-based grease lightly."
+    },
+    {
+      "key": "sidestand-switch",
+      "name": "Sidestand switch",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check operation and replace if necessary."
+    },
+    {
+      "key": "suspension-front",
+      "name": "Front fork",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check operation and for oil leakage. Replace if necessary."
+    },
+    {
+      "key": "suspension-rear",
+      "name": "Shock absorber assembly",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check operation and for oil leakage. Replace if necessary."
+    },
+    {
+      "key": "rear-suspension",
+      "name": "Rear suspension link pivots",
+      "action": "inspect",
+      "intervalKm": 12000,
+      "intervalMonths": 24,
+      "notes": "Check operation. Correct if necessary."
+    },
+    {
+      "key": "engine-oil",
+      "name": "Engine oil",
+      "action": "replace",
+      "intervalKm": 3000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Change (warm engine before draining)."
+    },
+    {
+      "key": "oil-filter",
+      "name": "Engine oil filter element",
+      "action": "replace",
+      "intervalKm": 6000,
+      "intervalMonths": 12,
+      "firstAtKm": 1000
+    },
+    {
+      "key": "brake-switches",
+      "name": "Front and rear brake switches",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check operation."
+    },
+    {
+      "key": "control-cables",
+      "name": "Control cables",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Apply Yamaha chain and cable lube or engine oil SAE 10W-30 thoroughly."
+    },
+    {
+      "key": "throttle",
+      "name": "Throttle grip housing and cable",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Check operation and free play. Adjust the throttle cable free play if necessary. Lubricate the throttle grip housing and cable."
+    },
+    {
+      "key": "lights",
+      "name": "Lights, signals and switches",
+      "action": "inspect",
+      "intervalKm": 6000,
+      "intervalMonths": 6,
+      "firstAtKm": 1000,
+      "notes": "Adjust headlight beam."
+    }
   ],
 };
 
