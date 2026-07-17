@@ -53,15 +53,24 @@ function loadMocks(): Record<string, any> {
   return mocks!;
 }
 
-export async function extractFromImage<T>({ imageUrl, prompt, schemaName, schema, model, reasoningEffort }: {
-  imageUrl: string,   // blob URL (public-but-unguessable) — passed straight to OpenAI, no re-download
+export async function extractFromImage<T>({ imageUrl, imageUrls, prompt, schemaName, schema, model, reasoningEffort }: {
+  imageUrl?: string,   // blob URL (public-but-unguessable) — passed straight to OpenAI, no re-download
+  imageUrls?: string[], // multi-image alternative (e.g. a receipt photographed page by
+                        // page — S11b): all images go in ONE user message, in order, so
+                        // the model reads them as one document. Exactly one of
+                        // imageUrl/imageUrls must be provided.
   prompt: string,
   schemaName: string, // doubles as the json_schema name and the MOCKS key
   schema: Record<string, unknown>, // plain JSON Schema (deliberately not zod — not a dependency)
   model?: string,               // defaults to MODELS.vision; per-feature override (e.g. odometer → gpt-5.6-luna)
   reasoningEffort?: ReasoningEffort, // gpt-5.x only; omit for models that don't support it
 }): Promise<T> {
-  console.log("services.ai.extractFromImage", { schemaName, imageUrl, model: model || MODELS.vision, reasoningEffort });
+  const urls = imageUrls ?? (imageUrl ? [imageUrl] : []);
+  console.log("services.ai.extractFromImage", { schemaName, imageCount: urls.length, model: model || MODELS.vision, reasoningEffort });
+
+  if (!urls.length) {
+    throw new Error(`services.ai.extractFromImage(${schemaName}): imageUrl or imageUrls is required`);
+  }
 
   if (mock()) {
     const mocks = loadMocks();
@@ -80,7 +89,7 @@ export async function extractFromImage<T>({ imageUrl, prompt, schemaName, schema
           role: "user",
           content: [
             { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: imageUrl } },
+            ...urls.map((url) => ({ type: "image_url" as const, image_url: { url } })),
           ],
         },
       ],

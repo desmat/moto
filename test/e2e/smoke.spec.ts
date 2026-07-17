@@ -72,14 +72,25 @@ test('recent custom log types show as shortcut buttons that prefill the dialog',
   });
   const { vehicle } = await vehicleRes.json();
   expect(vehicle?.id).toBeTruthy();
-  const seedRes = await page.request.post('/api/logs', {
-    data: { log: { vehicleId: vehicle.id, type: customType, entry: 'seed for shortcut test' } },
-  });
-  const { log: seedLog } = await seedRes.json();
-  expect(seedLog?.id).toBeTruthy();
 
-  await page.goto('/');
-  await expect(page.getByRole('button', { name: customType })).toBeVisible();
+  // Even a just-created log can lose the race when a parallel spec bursts >9 logs
+  // between our POST and the page render, so seed-and-check in a loop: each retry
+  // re-inserts a log of our type at the top of the window. Converges in one or two
+  // attempts in practice.
+  const seedLogIds: string[] = [];
+  const shortcutButton = page.getByRole('button', { name: customType });
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const seedRes = await page.request.post('/api/logs', {
+      data: { log: { vehicleId: vehicle.id, type: customType, entry: `seed for shortcut test #${attempt}` } },
+    });
+    const { log: seedLog } = await seedRes.json();
+    expect(seedLog?.id).toBeTruthy();
+    seedLogIds.push(seedLog.id);
+
+    await page.goto('/');
+    if (await shortcutButton.isVisible({ timeout: 3000 }).catch(() => false)) break;
+  }
+  await expect(shortcutButton).toBeVisible();
   await pause(page);
 
   // clicking it opens the custom-entry dialog with the type prefilled
@@ -101,7 +112,7 @@ test('recent custom log types show as shortcut buttons that prefill the dialog',
 
   // cleanup (same reasoning as the journal-entry test above)
   await page.request.delete(`/api/logs/${log.id}`);
-  await page.request.delete(`/api/logs/${seedLog.id}`);
+  for (const id of seedLogIds) await page.request.delete(`/api/logs/${id}`);
   await page.request.delete(`/api/vehicles/${vehicle.id}`);
 });
 

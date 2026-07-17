@@ -107,9 +107,9 @@ const receiptSchema = {
   additionalProperties: false,
 };
 
-const RECEIPT_PROMPT = `You are a strict transcriber reading a vehicle service receipt or invoice from a photo. You only report information actually printed on the receipt — never estimate, infer, or invent plausible values.
+const RECEIPT_PROMPT = `You are a strict transcriber reading a vehicle service receipt or invoice from one or more photos. When there are multiple photos, they are pages of the SAME single invoice, in order — read them together as one document (line items may span pages; the totals and vehicle details are often on the first or last page). Produce ONE combined result covering every page; never treat pages as separate invoices. You only report information actually printed on the receipt — never estimate, infer, or invent plausible values.
 
-First decide: is the image a legible receipt or invoice whose printed text you can actually read? Set receipt_clearly_visible accordingly. If it is false, every other field MUST be null and items MUST be an empty array — an empty result is the correct, expected answer for an unreadable or irrelevant photo; a fabricated invoice is the worst possible answer.
+First decide: do the photos show a legible receipt or invoice whose printed text you can actually read? Set receipt_clearly_visible accordingly (true if the document is readable overall, even if a page is poor). If it is false, every other field MUST be null and items MUST be an empty array — an empty result is the correct, expected answer for unreadable or irrelevant photos; a fabricated invoice is the worst possible answer.
 
 If the receipt is legible:
 - date: the service/invoice date, converted from whatever format is printed to YYYYMMDD.
@@ -162,11 +162,13 @@ export function normalizeReceipt(extracted: ExtractedReceipt): ReceiptReading {
   };
 }
 
-export async function readReceipt(imageUrl: string): Promise<ReceiptReading> {
-  console.log("services.receipt.readReceipt", { imageUrl });
+// one receipt may span several photos (page per pic — S11b); all images go to the
+// model in one call, in the order given (the dialog preserves pick order)
+export async function readReceipt(imageUrls: string[]): Promise<ReceiptReading> {
+  console.log("services.receipt.readReceipt", { imageCount: imageUrls.length });
 
   const extracted = await extractFromImage<ExtractedReceipt>({
-    imageUrl,
+    imageUrls,
     prompt: RECEIPT_PROMPT,
     schemaName: "receipt",
     schema: receiptSchema,

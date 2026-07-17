@@ -98,12 +98,17 @@ export default function ServiceLogDialog({
   // confirm; the second tap actually submits
   const [saveWarningArmed, setSaveWarningArmed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // one OCR shot per attachment: guards the effect below against re-firing when the
-  // attachments array changes for unrelated reasons (another upload, a removal, ...)
-  const lastOcrAttachmentId = useRef<string | null>(null);
+  // ids the OCR has already been given: the effect below re-fires only when a NEW ready
+  // image appears (a fresh page of the receipt), never on unrelated changes (removals,
+  // non-image uploads). A multi-page receipt is one pic per page (S11b), so every fire
+  // sends the FULL current set of ready images in one call.
+  const ocrSentIds = useRef<Set<string>>(new Set());
   // the OCR only REPLACES the items table while the user hasn't touched it
   const rowsEdited = useRef(false);
   const dateEdited = useRef(false);
+  // scalar fields the USER typed into (vendor/mileage/totalCost) — a re-fired
+  // extraction (more pages added) may overwrite its own earlier prefills, never these
+  const fieldEdited = useRef<Set<string>>(new Set());
 
   const sortedVehicles = vehicles ? Object.values(vehicles).sort(sortBy('createdAt')) : [];
 
@@ -121,9 +126,10 @@ export default function ServiceLogDialog({
       setAttachments([]);
       setOcr("idle");
       setSaveWarningArmed(false);
-      lastOcrAttachmentId.current = null;
+      ocrSentIds.current = new Set();
       rowsEdited.current = false;
       dateEdited.current = false;
+      fieldEdited.current = new Set();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -133,15 +139,15 @@ export default function ServiceLogDialog({
     setSaveWarningArmed(false);
   }, [mileage, vehicleId]);
 
-  const readReceipt = async (attachmentId: string) => {
-    lastOcrAttachmentId.current = attachmentId;
+  const readReceipt = async (attachmentIds: string[]) => {
+    ocrSentIds.current = new Set(attachmentIds);
     setOcr("reading");
 
     try {
       const token = await getToken();
       const res = await fetch("/api/ai/receipt", {
         headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ attachmentId }),
+        body: JSON.stringify({ attachmentIds }),
         method: "POST",
       });
 
@@ -150,41 +156,48 @@ export default function ServiceLogDialog({
       }
 
       const { result } = await res.json();
-      console.log("components.service-log-dialog.readReceipt", { attachmentId, result });
+      console.log("components.service-log-dialog.readReceipt", { attachmentIds, result });
 
       if (!result?.receipt_clearly_visible) {
         setOcr("low");
         return;
       }
 
-      // pre-fill ONLY the fields the user hasn't touched yet — a scan never clobbers
-      // manual input
-      if (result.vendor) setVendor((previous) => previous || result.vendor);
+      // pre-fill ONLY the fields the USER hasn't touched — a scan never clobbers manual
+      // input. Fields a previous (partial, fewer-pages) extraction filled ARE fair game
+      // for this fuller one: adding a page re-runs OCR over the whole set, and e.g. the
+      // real grand total often lives on the last-added page.
+      if (result.vendor && !fieldEdited.current.has("vendor")) setVendor(result.vendor);
       if (result.date && !dateEdited.current) {
         const parsed = moment(result.date, "YYYYMMDD", true);
         if (parsed.isValid()) setDate(parsed.format("YYYY-MM-DD"));
       }
-      if (result.mileage != null) setMileage((previous) => previous || String(result.mileage));
-      if (result.totalCost != null) setTotalCost((previous) => previous || String(result.totalCost));
+      if (result.mileage != null && !fieldEdited.current.has("mileage")) setMileage(String(result.mileage));
+      if (result.totalCost != null && !fieldEdited.current.has("totalCost")) setTotalCost(String(result.totalCost));
       if (Array.isArray(result.items) && result.items.length && !rowsEdited.current) {
         setRows(result.items);
       }
       setOcr("done");
     } catch (error) {
       // OCR is an accelerator, not a gate: any failure just leaves manual entry
-      console.error("components.service-log-dialog.readReceipt", { attachmentId, error });
+      console.error("components.service-log-dialog.readReceipt", { attachmentIds, error });
       setOcr("failed");
     }
   }
 
-  // auto-fire OCR when the newest attachment finishes uploading and is an image
+  // auto-fire OCR when a NEW image finishes uploading: send the FULL set of ready
+  // images (one receipt, page per pic) in one call. Waits until no image upload is in
+  // flight so a multi-file pick lands as ONE extraction over all pages, not one per
+  // page; removals alone never re-fire.
   useEffect(() => {
-    const newest = attachments[attachments.length - 1];
-    if (!newest || newest.status != "ready") return;
-    if (!newest.contentType?.startsWith("image/")) return;
-    if (newest.id == lastOcrAttachmentId.current) return;
+    const imageAttachments = attachments.filter((a) => a.contentType?.startsWith("image/"));
+    if (imageAttachments.some((a) => a.status == "uploading")) return;
 
-    readReceipt(newest.id);
+    const readyIds = imageAttachments.filter((a) => a.status == "ready").map((a) => a.id);
+    if (!readyIds.length) return;
+    if (!readyIds.some((id) => !ocrSentIds.current.has(id))) return;
+
+    readReceipt(readyIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attachments]);
 
@@ -395,7 +408,7 @@ export default function ServiceLogDialog({
                 placeholder="shop / vendor"
                 value={vendor}
                 onKeyDown={handleKeyDown}
-                onChange={(e) => setVendor(e.target.value)}
+                onChange={(e) => { fieldEdited.current.add("vendor"); setVendor(e.target.value); }}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -418,7 +431,7 @@ export default function ServiceLogDialog({
                 placeholder="18250"
                 value={mileage}
                 onKeyDown={handleKeyDown}
-                onChange={(e) => setMileage(e.target.value)}
+                onChange={(e) => { fieldEdited.current.add("mileage"); setMileage(e.target.value); }}
               />
             </div>
             <div className="flex flex-col gap-1 flex-1">
@@ -429,7 +442,7 @@ export default function ServiceLogDialog({
                 placeholder="0.00"
                 value={totalCost}
                 onKeyDown={handleKeyDown}
-                onChange={(e) => setTotalCost(e.target.value)}
+                onChange={(e) => { fieldEdited.current.add("totalCost"); setTotalCost(e.target.value); }}
               />
             </div>
           </div>

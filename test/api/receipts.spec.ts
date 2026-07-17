@@ -98,6 +98,49 @@ test('POST /api/ai/receipt 400s for a non-image attachment', async ({ request })
   await request.delete(`/api/attachments/${attachment.id}`);
 });
 
+test('POST /api/ai/receipt accepts multiple pages (attachmentIds) and validates each', async ({ request }) => {
+  // a receipt photographed page by page (S11b) goes up as attachmentIds: [...]
+  const pages = [];
+  for (const suffix of ['page1', 'page2']) {
+    const res = await request.post('/api/attachments', { data: { attachment: testAttachment(suffix) } });
+    const { attachment } = await res.json();
+    expect(attachment?.id).toBeTruthy();
+    pages.push(attachment);
+  }
+
+  // both pages readable → one combined (canned) result
+  const ocrRes = await request.post('/api/ai/receipt', {
+    data: { attachmentIds: pages.map((p) => p.id) },
+  });
+  expect(ocrRes.ok()).toBeTruthy();
+  const { result } = await ocrRes.json();
+  expect(result?.receipt_clearly_visible).toBe(true);
+  expect(result?.vendor).toBe('Moto Garage TestShop');
+
+  // one bad id in the batch → 404 for the whole call
+  const missingRes = await request.post('/api/ai/receipt', {
+    data: { attachmentIds: [pages[0].id, 'does-not-exist'] },
+  });
+  expect(missingRes.status()).toBe(404);
+
+  // one non-image in the batch → 400 for the whole call
+  const pdfRes = await request.post('/api/attachments', {
+    data: { attachment: testAttachment('page-pdf', 'application/pdf') },
+  });
+  const { attachment: pdf } = await pdfRes.json();
+  const mixedRes = await request.post('/api/ai/receipt', {
+    data: { attachmentIds: [pages[0].id, pdf.id] },
+  });
+  expect(mixedRes.status()).toBe(400);
+
+  // an empty list is "nothing to read", not a 500
+  const emptyRes = await request.post('/api/ai/receipt', { data: { attachmentIds: [] } });
+  expect(emptyRes.status()).toBe(404);
+
+  for (const p of pages) await request.delete(`/api/attachments/${p.id}`);
+  await request.delete(`/api/attachments/${pdf.id}`);
+});
+
 test('service-log mileage updates the vehicle monotonically; mileage logs keep overwrite-always', async ({ request }) => {
   // fresh vehicle owned by this run, starting at 1000
   const vehicleRes = await request.post('/api/vehicles', { data: { vehicle: testVehicle(1000) } });
