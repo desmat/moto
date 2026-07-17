@@ -1,5 +1,17 @@
 {
   "odometer": { "odometer_digits_clearly_visible": true, "reading": 12345, "unit": "km", "confidence": "high" },
+  "receipt": {
+    "receipt_clearly_visible": true,
+    "date": "20260315",
+    "vendor": "Moto Garage TestShop",
+    "mileage": 17200,
+    "totalCost": 612.45,
+    "items": [
+      { "key": "front-tire", "name": "Front tire", "action": "replace", "note": "Michelin Anakee Adventure", "cost": 289.99 },
+      { "key": "engine-oil", "name": "Engine oil", "action": "replace", "note": "10W-30 full synthetic", "cost": 89.5 },
+      { "key": "chain", "name": "Drive chain", "action": "lubricate", "note": null, "cost": 25 }
+    ]
+  },
   "pageTranscription": { "page_text_clearly_legible": true, "text": "Mock page transcription: check tire pressure weekly.\n\nKeep chain lubricated every 500 km." },
   "manualSchedule": {
     "schedule_table_found": true,

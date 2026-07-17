@@ -5,6 +5,7 @@ import { formatTimeFromNow } from "@desmat/utils/format";
 import { Gauge, NotebookPen, Paperclip, Wrench } from "lucide-react";
 import Link from "next/link";
 import LogEntryDialog, { LogEntryMode } from "@/components/log-entry-dialog";
+import ServiceLogDialog from "@/components/service-log-dialog";
 // charts deliberately disabled for now (they render dummy data) -- revive these imports
 // and the Charts section below once real reporting lands (roadmap 4.2, via the unused
 // `counters` mechanism in @desmat/redis-store)
@@ -15,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useLog } from "@/hooks/use-log";
 import { useUser } from "@/hooks/use-user";
 import { useVehicle } from "@/hooks/use-vehicle";
-import { LogTypeJournal, LogTypeMileage } from "@/types/Log";
+import { LogTypeJournal, LogTypeMileage, LogTypeService } from "@/types/Log";
 import { vehicleName } from "@/types/Vehicle";
 
 function logIcon(type: string) {
@@ -49,16 +50,20 @@ export default function Page() {
 
   // the most recently used custom log types, as quick-record shortcuts under the
   // main Record buttons (latestLogs is already sorted newest-first, so keeping each
-  // type's first occurrence keeps its most recent position)
+  // type's first occurrence keeps its most recent position). "service" is excluded
+  // like the other built-ins: it has its own dedicated Record button (S11)
   const recentCustomTypes = (latestLogs || [])
     .map((log: any) => log.type as string)
     .filter((type: string, index: number, types: string[]) =>
-      type != LogTypeJournal && type != LogTypeMileage && types.indexOf(type) == index)
+      type != LogTypeJournal && type != LogTypeMileage && type != LogTypeService
+      && types.indexOf(type) == index)
     .slice(0, 3);
 
   console.log("app.page.Page", { loaded, vehicles, logs });
 
-  const recordLog = async (log: { vehicleId: string, type: string, entry: string, attachmentIds: string[] }) => {
+  // extra structured fields from the service dialog (date/items/mileage/vendor/...)
+  // ride along untouched: the hook and the POST route spread the whole log through
+  const recordLog = async (log: { vehicleId: string, type: string, entry: string, attachmentIds: string[] } & Record<string, any>) => {
     const ret = await addLog(log);
     console.log("app.page.Page.recordLog", { ret });
   }
@@ -98,6 +103,18 @@ export default function Page() {
               </Button>
             </LogEntryDialog>
           ))}
+          <ServiceLogDialog
+            vehicles={vehicles && Object.values(vehicles)}
+            defaultVehicleId={defaultVehicleId}
+            onSubmit={recordLog}
+          >
+            <Button
+              disabled={!loaded}
+              href="#"
+            >
+              Service / Receipt
+            </Button>
+          </ServiceLogDialog>
         </div>
         {recentCustomTypes.length > 0 &&
           <div className="flex flex-col md:flex-row justify-center gap-1">

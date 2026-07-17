@@ -39,14 +39,25 @@ export async function saveLog(data: any, user: SessionUser): Promise<Log | undef
   });
 
   // a mileage log doubles as the vehicle's odometer reading: keep the vehicle record's
-  // mileage in sync so it always reflects the latest recorded value
-  if (saved?.type == LogTypeMileage) {
-    const mileage = parseFloat(saved.entry);
-    const vehicle = saved.vehicleId ? await store.vehicles.get(saved.vehicleId) : undefined;
+  // mileage in sync so it always reflects the latest recorded value. Two rules by type:
+  // - mileage-type logs overwrite ALWAYS (the entry IS an odometer reading; deliberate
+  //   downward corrections stay possible here)
+  // - any other log type carrying a numeric `mileage` field (e.g. an S11 service log
+  //   with the odometer printed on the receipt) updates the vehicle MONOTONICALLY --
+  //   only when it's higher than the current value -- because receipts are frequently
+  //   backdated and must never clobber a newer reading
+  const isMileageLog = saved?.type == LogTypeMileage;
+  const mileage = isMileageLog ? parseFloat(saved.entry) : saved?.mileage;
 
-    if (vehicle && vehicle.userId == saved.userId && Number.isFinite(mileage)) {
+  if (saved?.vehicleId && (isMileageLog || Number.isFinite(mileage))) {
+    const vehicle = await store.vehicles.get(saved.vehicleId);
+
+    if (vehicle && vehicle.userId == saved.userId && typeof mileage == "number" && Number.isFinite(mileage)
+      && (isMileageLog || mileage > (vehicle.mileage ?? 0))) {
       await store.vehicles.update({ ...vehicle, mileage, updatedBy: user.id });
     }
+
+    // S12 appends its vehicle.components update here, in this same fetched-vehicle scope
   }
 
   console.log("services.logs.saveLog", { saved });

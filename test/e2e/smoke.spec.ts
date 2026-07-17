@@ -58,36 +58,51 @@ test('front page loads, shows seeded entries, and records a journal entry', asyn
 });
 
 test('recent custom log types show as shortcut buttons that prefill the dialog', async ({ page }) => {
-  await page.goto('/');
+  // Per the test-isolation convention, create our OWN custom-typed log rather than
+  // asserting on a seeded one: the shortcut row derives from the dashboard's newest
+  // entries, and under fullyParallel other specs flood the store with newer logs —
+  // seed-derived shortcuts get displaced from that window mid-run (which is exactly
+  // how the old seed-based version of this test went flaky after S11's seed retype).
+  // A just-created custom type is the newest custom type at assert time; built-in
+  // types (journal/mileage/service) created by parallel specs are excluded from the
+  // row, so only the 10-newest window matters — and a fresh log sits safely inside it.
+  const customType = `smoke shortcut ${Date.now()}`;
+  const vehicleRes = await page.request.post('/api/vehicles', {
+    data: { vehicle: { type: 'motorcycle', maker: 'Smoke', model: `Shortcut ${Date.now()}`, year: 2024 } },
+  });
+  const { vehicle } = await vehicleRes.json();
+  expect(vehicle?.id).toBeTruthy();
+  const seedRes = await page.request.post('/api/logs', {
+    data: { log: { vehicleId: vehicle.id, type: customType, entry: 'seed for shortcut test' } },
+  });
+  const { log: seedLog } = await seedRes.json();
+  expect(seedLog?.id).toBeTruthy();
 
-  // the seeded history (services/stores/memory.ts) has three custom-typed logs; their
-  // types should surface as quick-record buttons under the main Record row, most
-  // recent first
-  const shortcuts = ['oil change', 'chain adjustment', 'new tires'];
-  for (const type of shortcuts) {
-    await expect(page.getByRole('button', { name: type })).toBeVisible();
-  }
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: customType })).toBeVisible();
   await pause(page);
 
-  // clicking one opens the custom-entry dialog with the type prefilled
-  await page.getByRole('button', { name: 'oil change' }).click();
+  // clicking it opens the custom-entry dialog with the type prefilled
+  await page.getByRole('button', { name: customType }).click();
   await expect(page.getByRole('dialog', { name: 'Custom Entry' })).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Type' })).toHaveValue('oil change');
+  await expect(page.getByRole('textbox', { name: 'Type' })).toHaveValue(customType);
   await pause(page);
 
   // record through the prefilled dialog end-to-end
-  const entryText = `smoke test oil change ${Date.now()}`;
+  const entryText = `smoke test shortcut entry ${Date.now()}`;
   await page.getByRole('textbox', { name: 'Entry' }).fill(entryText);
   const addResponsePromise = page.waitForResponse((res) =>
     res.url().includes('/api/logs') && res.request().method() === 'POST');
   await page.getByRole('button', { name: 'Save' }).click();
   const { log } = await (await addResponsePromise).json();
-  expect(log?.type).toBe('oil change');
+  expect(log?.type).toBe(customType);
   expect(log?.entry).toBe(entryText);
   await pause(page);
 
   // cleanup (same reasoning as the journal-entry test above)
   await page.request.delete(`/api/logs/${log.id}`);
+  await page.request.delete(`/api/logs/${seedLog.id}`);
+  await page.request.delete(`/api/vehicles/${vehicle.id}`);
 });
 
 test('Tailwind theme utilities are actually compiled into the page', async ({ page }) => {

@@ -106,7 +106,7 @@ const seed: Partial<Record<StoreEntityName, any[]>> = {
 // to "now" (not literal date strings) so this stays meaningful whenever the dev server
 // happens to start.
 function buildLogSeeds(): any[] {
-  const mk = (daysAgo: number, type: string, entry: string, suffix: string) => {
+  const mk = (daysAgo: number, type: string, entry: string, suffix: string, extra: Record<string, any> = {}) => {
     const createdAt = moment().subtract(daysAgo, "days").hour(10).minute(0).second(0).valueOf();
 
     return {
@@ -117,16 +117,31 @@ function buildLogSeeds(): any[] {
       type,
       date: moment(createdAt).format("YYYYMMDD"),
       entry,
+      ...extra,
     };
   };
 
+  // the former "oil change"/"new tires" custom-type seeds are proper `service` logs
+  // since S11, with structured `items` keyed to CANONICAL_COMPONENT_KEYS -- gives S12
+  // and Phase 3 seeded structure to work against out of the box (ids/dates/entries
+  // unchanged; smoke-log-7 keeps its seeded attachment link)
   return [
     mk(0, "journal", "Chain cleaned and lubed after the weekend ride.", "1"),
     mk(1, "mileage", "18250", "2"),
-    mk(3, "oil change", "Full synthetic 10W-30, new filter.", "3"),
+    mk(3, "service", "Full synthetic 10W-30, new filter.", "3", {
+      items: [
+        { key: "engine-oil", name: "Engine oil", action: "replace", note: "Full synthetic 10W-30" },
+        { key: "oil-filter", name: "Oil filter", action: "replace" },
+      ],
+    }),
     mk(5, "chain adjustment", "Tightened to 35mm slack, cleaned and lubed.", "6"),
     mk(8, "journal", "Front brake lever feels spongy, bleed brakes soon.", "4"),
-    mk(10, "new tires", "Michelin Anakee Adventure front and rear.", "7"),
+    mk(10, "service", "Michelin Anakee Adventure front and rear.", "7", {
+      items: [
+        { key: "front-tire", name: "Front tire", action: "replace", note: "Michelin Anakee Adventure" },
+        { key: "rear-tire", name: "Rear tire", action: "replace", note: "Michelin Anakee Adventure" },
+      ],
+    }),
     mk(12, "mileage", "17980", "5"),
   ];
 }
