@@ -49,7 +49,7 @@ export default function Page() {
                     className="grid gap-0"
                     href={`/logs/${log.id}`}
                   >
-                    <span className="group-hover:underline capitalize-first">
+                    <span className="group-hover:underline capitalize-first line-clamp-2">
                       {/* photo-only entries (S4) have no text: fall back to a placeholder so the row isn't blank */}
                       {log.entry?.trim() || "(photo)"}
                       {log.attachmentCount > 0 &&

@@ -178,7 +178,7 @@ export default function Page() {
                   className="grid gap-0"
                   href={`/logs/${log.id}`}
                 >
-                  <span className="group-hover:underline capitalize-first _flex _items-top gap-0">
+                  <span className="group-hover:underline capitalize-first _flex _items-top gap-0 line-clamp-2">
                     <Icon className="h-[1.2rem] float-left mt-[0.15rem] ml-[-0.35rem] mr-[0.15rem]" />
                     {/* photo-only entries (S4) have no text: fall back to a placeholder so the row isn't blank */}
                     <span className="capitalize-first">{log.entry?.trim() || "(photo)"}</span>

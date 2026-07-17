@@ -177,6 +177,19 @@ test('a service log saved without notes gets an entry composed from its items + 
   const { log: noVendorLog } = await noVendorRes.json();
   expect(noVendorLog?.entry).toBe('Drive chain');
 
+  // a real 25-line invoice must not flood the entry: capped names + "+N more"
+  const manyItems = Array.from({ length: 25 }, (_, i) => ({
+    key: `part-${i}`, name: `Replacement part number ${i}`, action: 'replace',
+  }));
+  const manyRes = await request.post('/api/logs', {
+    data: {
+      log: { vehicleId: vehicle.id, type: 'service', items: manyItems, vendor: 'Big Invoice Shop' },
+    },
+  });
+  const { log: manyLog } = await manyRes.json();
+  expect(manyLog?.entry).toMatch(/\+\d+ more — Big Invoice Shop$/);
+  expect(manyLog?.entry.length).toBeLessThan(200);
+
   // user-typed notes always win
   const typedRes = await request.post('/api/logs', {
     data: {
@@ -192,7 +205,7 @@ test('a service log saved without notes gets an entry composed from its items + 
   const { log: typedLog } = await typedRes.json();
   expect(typedLog?.entry).toBe('my own words');
 
-  for (const l of [log, noVendorLog, typedLog]) await request.delete(`/api/logs/${l.id}`);
+  for (const l of [log, noVendorLog, manyLog, typedLog]) await request.delete(`/api/logs/${l.id}`);
   await request.delete(`/api/vehicles/${vehicle.id}`);
 });
 
