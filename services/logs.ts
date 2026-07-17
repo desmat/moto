@@ -1,7 +1,7 @@
 import moment from "moment";
 import { deleteAttachment, getAttachments } from "./attachments";
 import { createStore } from "./stores";
-import { Log, LogTypeMileage } from "@/types/Log";
+import { Log, LogTypeMileage, LogTypeService } from "@/types/Log";
 import { SessionUser } from "@/types/User";
 
 const store = createStore({
@@ -29,6 +29,15 @@ export async function saveLog(data: any, user: SessionUser): Promise<Log | undef
     date: data.date || moment().format("YYYYMMDD"),
     entry: `${data.entry || ""}`.trim(),
   };
+
+  // a service log saved without notes still deserves a readable entry (lists render
+  // log.entry): compose one from its structured data — item names, plus the vendor when
+  // known. User-typed notes always win; done here in the service so every entrance
+  // (receipt dialog, API, S13's proposed logs) gets it.
+  if (log.type == LogTypeService && !log.entry && Array.isArray(log.items) && log.items.length) {
+    const names = log.items.map((item: any) => item?.name || item?.key).filter(Boolean).join(", ");
+    log.entry = [names, log.vendor].filter(Boolean).join(" — ");
+  }
 
   const exists = log.id && await store.logs.exists(log.id);
 

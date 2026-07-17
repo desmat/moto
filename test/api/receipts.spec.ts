@@ -141,6 +141,61 @@ test('POST /api/ai/receipt accepts multiple pages (attachmentIds) and validates 
   await request.delete(`/api/attachments/${pdf.id}`);
 });
 
+test('a service log saved without notes gets an entry composed from its items + vendor', async ({ request }) => {
+  const vehicleRes = await request.post('/api/vehicles', { data: { vehicle: testVehicle(500) } });
+  const { vehicle } = await vehicleRes.json();
+  expect(vehicle?.id).toBeTruthy();
+
+  // no entry text → composed from item names + vendor
+  const res = await request.post('/api/logs', {
+    data: {
+      log: {
+        vehicleId: vehicle.id,
+        type: 'service',
+        items: [
+          { key: 'front-tire', name: 'Front tire', action: 'replace' },
+          { key: 'engine-oil', name: 'Engine oil', action: 'replace' },
+        ],
+        vendor: 'Entry TestShop',
+      },
+    },
+  });
+  expect(res.ok()).toBeTruthy();
+  const { log } = await res.json();
+  expect(log?.entry).toBe('Front tire, Engine oil — Entry TestShop');
+
+  // no vendor → just the item names
+  const noVendorRes = await request.post('/api/logs', {
+    data: {
+      log: {
+        vehicleId: vehicle.id,
+        type: 'service',
+        items: [{ key: 'chain', name: 'Drive chain', action: 'lubricate' }],
+      },
+    },
+  });
+  const { log: noVendorLog } = await noVendorRes.json();
+  expect(noVendorLog?.entry).toBe('Drive chain');
+
+  // user-typed notes always win
+  const typedRes = await request.post('/api/logs', {
+    data: {
+      log: {
+        vehicleId: vehicle.id,
+        type: 'service',
+        entry: 'my own words',
+        items: [{ key: 'chain', name: 'Drive chain', action: 'lubricate' }],
+        vendor: 'Entry TestShop',
+      },
+    },
+  });
+  const { log: typedLog } = await typedRes.json();
+  expect(typedLog?.entry).toBe('my own words');
+
+  for (const l of [log, noVendorLog, typedLog]) await request.delete(`/api/logs/${l.id}`);
+  await request.delete(`/api/vehicles/${vehicle.id}`);
+});
+
 test('service-log mileage updates the vehicle monotonically; mileage logs keep overwrite-always', async ({ request }) => {
   // fresh vehicle owned by this run, starting at 1000
   const vehicleRes = await request.post('/api/vehicles', { data: { vehicle: testVehicle(1000) } });
