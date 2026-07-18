@@ -25,6 +25,17 @@ test('punctuation differences in the stored model never block a match', () => {
   expect(matchVehicleDescription('SUZUKI GSXR750', gsxr)?.id).toBe('gsxr');
 });
 
+test('loose model overlap: a shop\'s naming variant still matches (real-receipt case)', () => {
+  // the record says CRF250RL; the shop printed "CRF250 Rally" plus the VIN — the
+  // shared "CRF250" prefix (75% of the model) is enough evidence
+  const crf = [...garage, vehicle('crf', 'Honda', 'CRF250RL', 2020)];
+  expect(matchVehicleDescription('Honda CRF250 Rally - MLHMD4426L5300137', crf)?.id).toBe('crf');
+
+  // and the reverse: a verbose record model vs the shop's terse variant
+  const rally = [vehicle('rally', 'Honda', 'CRF250 Rally', 2020)];
+  expect(matchVehicleDescription('HONDA CRF250RL', rally)?.id).toBe('rally');
+});
+
 test('no model match → undefined (maker alone is not enough)', () => {
   expect(matchVehicleDescription('2021 HONDA AFRICA TWIN', garage)).toBeUndefined();
   expect(matchVehicleDescription('', garage)).toBeUndefined();

@@ -105,7 +105,6 @@ export default function Page() {
           ))}
           <ServiceLogDialog
             vehicles={vehicles && Object.values(vehicles)}
-            defaultVehicleId={defaultVehicleId}
             onSubmit={recordLog}
           >
             <Button

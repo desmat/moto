@@ -105,11 +105,12 @@ test('an untouched vehicle picker auto-selects the vehicle printed on the receip
   await page.getByRole('button', { name: 'Service / Receipt' }).click();
   await expect(page.getByRole('dialog', { name: 'Service / Receipt' })).toBeVisible();
 
-  // no manual vehicle selection: whatever the picker defaulted to (racy under the
-  // parallel run — it's the most recently logged vehicle), after the scan it must land
-  // on the receipt's printed "2021 HONDA CB500X". That resolves against the seeded
-  // CB500X — a read-only garage lookup this feature inherently depends on; no spec
-  // creates a CB500X-model vehicle, so the match stays unambiguous.
+  // the picker starts deliberately UNSELECTED (S12c) so a receipt can't silently land
+  // on a defaulted wrong bike; after the scan it must land on the receipt's printed
+  // "2021 HONDA CB500X". That resolves against the seeded CB500X — a read-only garage
+  // lookup this feature inherently depends on; no spec creates a CB500X-model vehicle,
+  // so the match stays unambiguous.
+  await expect(page.getByLabel('Vehicle')).toHaveValue('');
   await expect(page.getByRole('button', { name: 'Add receipt photo / file' })).toBeEnabled();
   await page.locator('input[type="file"]').setInputFiles(fixtureImage);
 

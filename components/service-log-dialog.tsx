@@ -62,12 +62,10 @@ const itemColumns: ExtractedRowsColumn[] = [
 
 export default function ServiceLogDialog({
   vehicles,
-  defaultVehicleId,
   onSubmit,
   children,
 }: {
   vehicles?: Vehicle[],
-  defaultVehicleId?: string,
   onSubmit?: (log: {
     vehicleId: string,
     type: string,
@@ -120,7 +118,10 @@ export default function ServiceLogDialog({
 
   useEffect(() => {
     if (open) {
-      setVehicleId(defaultVehicleId || sortedVehicles[0]?.id || "");
+      // deliberately UNSELECTED with multiple vehicles (no "most recent" guess): the
+      // receipt scan auto-selects on a match, and Save stays disabled until a vehicle
+      // is chosen — a receipt can't silently land on the wrong bike
+      setVehicleId(sortedVehicles.length == 1 ? sortedVehicles[0].id : "");
       setVendor("");
       setDate(moment().format("YYYY-MM-DD")); // default today
       setMileage("");
@@ -414,6 +415,7 @@ export default function ServiceLogDialog({
                 value={vehicleId}
                 onChange={(e) => { vehicleEdited.current = true; setVehicleId(e.target.value); }}
               >
+                <option value="" disabled>Select a vehicle…</option>
                 {sortedVehicles.map((v: Vehicle) => (
                   <option key={v.id} value={v.id}>{vehicleName(v)}</option>
                 ))}
