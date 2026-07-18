@@ -1,3 +1,159 @@
 {
-  "odometer": { "odometer_digits_clearly_visible": true, "reading": 12345, "unit": "km", "confidence": "high" }
+  "odometer": {
+    "odometer_digits_clearly_visible": true,
+    "reading": 12345,
+    "unit": "km",
+    "confidence": "high"
+  },
+  "receipt": {
+    "receipt_clearly_visible": true,
+    "date": "20260315",
+    "vendor": "Moto Garage TestShop",
+    "vehicle": "2021 HONDA CB500X",
+    "mileage": 17200,
+    "totalCost": 612.45,
+    "items": [
+      {
+        "key": "front-tire",
+        "name": "Front tire",
+        "action": "replace",
+        "note": "Michelin Anakee Adventure",
+        "cost": 289.99
+      },
+      {
+        "key": "engine-oil",
+        "name": "Engine oil",
+        "action": "replace",
+        "note": "10W-30 full synthetic",
+        "cost": 89.5
+      },
+      {
+        "key": "chain",
+        "name": "Drive chain",
+        "action": "lubricate",
+        "note": null,
+        "cost": 25
+      }
+    ]
+  },
+  "onboarding": [
+    {
+      "message": "Nice ride! Let's get it set up — what's the current mileage on the odometer?",
+      "done": false,
+      "suggestUpload": false,
+      "proposal": { "mileage": null, "logs": [] }
+    },
+    {
+      "message": "Got it, 12,800 km. When did you last change the engine oil? A rough guess is fine.",
+      "done": false,
+      "suggestUpload": false,
+      "proposal": {
+        "mileage": 12800,
+        "logs": [
+          { "type": "mileage", "date": "20260701", "entry": "12800", "items": [], "mileage": 12800, "estimated": false }
+        ]
+      }
+    },
+    {
+      "message": "Thanks — I'll note that oil change as an estimate. Anything else recent, like the chain, tires, or brakes? If you have the owner's manual as a PDF you can upload it now too.",
+      "done": false,
+      "suggestUpload": true,
+      "proposal": {
+        "mileage": 12800,
+        "logs": [
+          {
+            "type": "service",
+            "date": "20260315",
+            "entry": "Oil change (estimated from onboarding interview)",
+            "items": [{ "key": "engine-oil", "name": "Engine oil", "action": "replace", "note": null }],
+            "mileage": 10800,
+            "estimated": true
+          },
+          { "type": "mileage", "date": "20260701", "entry": "12800", "items": [], "mileage": 12800, "estimated": false }
+        ]
+      }
+    },
+    {
+      "message": "That's everything I need — here's what I'll record. Review and confirm below.",
+      "done": true,
+      "suggestUpload": false,
+      "proposal": {
+        "mileage": 12800,
+        "logs": [
+          {
+            "type": "service",
+            "date": "20260315",
+            "entry": "Oil change (estimated from onboarding interview)",
+            "items": [{ "key": "engine-oil", "name": "Engine oil", "action": "replace", "note": null }],
+            "mileage": 10800,
+            "estimated": true
+          },
+          { "type": "mileage", "date": "20260701", "entry": "12800", "items": [], "mileage": 12800, "estimated": false }
+        ]
+      }
+    }
+  ],
+  "pageTranscription": {
+    "page_text_clearly_legible": true,
+    "text": "Mock page transcription: check tire pressure weekly.\n\nKeep chain lubricated every 500 km."
+  },
+  "manualSchedule": {
+    "schedule_table_found": true,
+    "items": [
+      {
+        "key": "engine-oil",
+        "name": "Engine oil",
+        "action": "replace",
+        "intervalKm": 8000,
+        "intervalMonths": 12,
+        "firstAtKm": 1000,
+        "notes": "Original: every 8 000 km (5 000 mi) or 12 months; initial change at 1 000 km (600 mi)"
+      },
+      {
+        "key": "oil-filter",
+        "name": "Engine oil filter",
+        "action": "replace",
+        "intervalKm": 16000,
+        "intervalMonths": 24,
+        "firstAtKm": 1000,
+        "notes": "Replace with every second oil change"
+      },
+      {
+        "key": "air-filter",
+        "name": "Air cleaner element",
+        "action": "replace",
+        "intervalKm": 16000,
+        "intervalMonths": null,
+        "firstAtKm": null,
+        "notes": "Service more frequently when riding in dusty areas"
+      },
+      {
+        "key": "chain",
+        "name": "Drive chain",
+        "action": "lubricate",
+        "intervalKm": 1000,
+        "intervalMonths": null,
+        "firstAtKm": null,
+        "notes": "Clean and lubricate every 1 000 km (600 mi) and after riding in rain"
+      },
+      {
+        "key": "valve-clearance",
+        "name": "Valve clearance",
+        "action": "inspect",
+        "intervalKm": 24000,
+        "intervalMonths": null,
+        "firstAtKm": null,
+        "notes": "Original: every 24 000 km (16 000 mi)"
+      },
+      {
+        "key": "brake-fluid",
+        "name": "Brake fluid",
+        "action": "replace",
+        "intervalKm": null,
+        "intervalMonths": 24,
+        "firstAtKm": null,
+        "notes": "Replace every 2 years regardless of distance"
+      }
+    ]
+  }
 }

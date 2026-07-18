@@ -6,7 +6,7 @@ Story: [phase-2.md](../phase-2.md) § S12. Depends on S11 (structured `items` on
 
 - **Written where mileage is written**: the same post-save block in `services/logs.ts` that S11 just refactored. One vehicle fetch, one vehicle update, both concerns.
 - **Update rules**:
-  - Every item on a saved log with `items[]` touches `components[item.key]` — *unless* the existing state entry is **newer** (`existing.date > log.date`): backdated receipts (and S13's seeded history) must never overwrite fresher state. Compare on `date` (YYYYMMDD string compare works), tiebreak by taking the write (same-day re-log wins).
+  - **Only `service`-type logs update `components`** (S0 review decision, aligning with S11: hostile/hand-added `items[]` on a journal log stays stored-but-inert — an extraction flow always produces `type: "service"`, so nothing legitimate is lost, and the JSON editor can't turn a diary entry into a state mutation). Every item on a saved *service* log with `items[]` touches `components[item.key]` — *unless* the existing state entry is **newer** (`existing.date > log.date`): backdated receipts (and S13's seeded history) must never overwrite fresher state. Compare on `date` (YYYYMMDD string compare works), tiebreak by taking the write (same-day re-log wins).
   - `action` ∈ `replace`-like (`replace`, plus treat `other` with no prior entry as install) sets `detail` (from `item.note || item.name` — the receipt's "Michelin Anakee Adventure" lives in the note/name); every action updates `action`/`date`/`mileage`/`logId` ("last touched").
 - **Not derived-on-read, and deletion doesn't cascade**: deleting the source log leaves the snapshot standing (phase-doc AC; state is "what's on the bike", not an index of logs). A rebuild-from-logs admin script is the recovery tool and belongs in this story (cheap here, annoying later): `npm run admin` one-off gated by `ADMIN_CONFIRM`, replaying a user's logs oldest-first through the same update function.
 - **Hand-editable by design** via the vehicle JSON editor (identity fields stay pinned; `components` is just data).
@@ -53,6 +53,7 @@ Add a commented-out one-off (matching the file's existing style of uncomment-to-
 3. *Backdated* replace of the same key (older `date`) → state unchanged (newer-wins rule).
 4. Two logs with `front-tire` key from different phrasings (extraction-time canonicalization simulated by using the same key) → single entry.
 5. Deleting the source log → `components` untouched.
+6. A `journal`-type log carrying `items[]` → `components` untouched (service-only rule).
 
 e2e: seeded service logs (S11's memory-seed upgrade) → vehicle page shows the "Current setup" card with `front-tire`/`rear-tire`/`engine-oil` rows out of the box; date link opens the seeded log.
 

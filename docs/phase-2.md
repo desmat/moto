@@ -84,7 +84,7 @@ Upload flow for `type: "manual"` documents additionally extracts a structured ma
 
 ## S12 — Vehicle current-state ("what's on the bike now")
 
-Resolves the roadmap's open question (entity vs. sub-field): **sub-field on `Vehicle`** — `components?: { [key: string]: { name, detail?, action, date, mileage?, logId } }` — maintained by `saveLog` whenever a log carries structured `items`, exactly mirroring the existing `vehicle.mileage` sync precedent ([services/logs.ts:40-49](../services/logs.ts#L40-L49)). Rationale: current-state is a derived snapshot, not a thing that happened (history stays in logs); a fourth entity would add six touchpoints of ceremony for what is one map that's always read with the vehicle. The `logId` back-pointer keeps it auditable, and it's rebuildable from logs if it ever drifts. Tradeoff accepted: it's editable via the vehicle JSON editor — fine, identity fields are still pinned, and hand-correcting state is arguably a feature.
+Resolves the roadmap's open question (entity vs. sub-field): **sub-field on `Vehicle`** — `components?: { [key: string]: { name, detail?, action, date, mileage?, logId } }` — maintained by `saveLog` whenever a log carries structured `items`, exactly mirroring the existing `vehicle.mileage` sync precedent ([services/logs.ts:41-50](../services/logs.ts#L41-L50)). Rationale: current-state is a derived snapshot, not a thing that happened (history stays in logs); a fourth entity would add six touchpoints of ceremony for what is one map that's always read with the vehicle. The `logId` back-pointer keeps it auditable, and it's rebuildable from logs if it ever drifts. Tradeoff accepted: it's editable via the vehicle JSON editor — fine, identity fields are still pinned, and hand-correcting state is arguably a feature.
 
 - `key` is a normalized slug of the item name ("Front tire — Michelin Anakee Adventure" → `front-tire`); the extraction schema (S10/S11) should ask the model for a canonical `key` alongside the display name so slugs converge ("front tyre", "fr tire" → `front-tire`). Fuzzy reconciliation beyond that is Phase 3's matcher problem.
 - Only `replace`/`install`-type actions update `detail` (what's mounted); any action updates `date`/`mileage` (last touched).
@@ -123,7 +123,7 @@ Augment, don't replace: the forced `SetupVehicleDialog` stays (it's already mini
 | S10 Manual → MaintenanceSchedule | S8, S9 | L |
 | S11 Receipt → structured service log | S1, S4 | M–L |
 | S12 Vehicle current-state | S11 | S–M |
-| S13 AI onboarding interview | S1 (richer with S9–S12) | L |
+| S13 AI onboarding interview | S1, S11 (richer with S8–S12) | L |
 
 S7/S8 and S11 are independent tracks; S11+S12 (receipts → state) is the highest user-visible value per effort and can ship before the manual pipeline (S9/S10) if desired. S13 last — it stitches the others together.
 

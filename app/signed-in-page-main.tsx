@@ -1,9 +1,11 @@
 'use client'
 
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import "./globals.css";
 import { SIDEBAR_WIDTH, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { NoSsr } from '@/components/no-ssr';
+import OnboardingInterview from '@/components/onboarding-interview';
 import SetupVehicleDialog from '@/components/setup-vehicle-dialog';
 import { useVehicle } from '@/hooks/use-vehicle';
 
@@ -14,9 +16,20 @@ export default function SignedInPageMain({
 }) {
   const { open, isMobile } = useSidebar();
   const { loaded: vehiclesLoaded, vehicles, add: addVehicle } = useVehicle();
+  // the just-created first vehicle, held from addVehicle's response so the AI
+  // onboarding interview (S13) can follow the forced setup dialog for that vehicle
+  const [interviewVehicle, setInterviewVehicle] = useState<any>();
 
   // first-run onboarding: force the add-a-vehicle dialog until the user has one
   const showSetupDialog = vehiclesLoaded && vehicles && Object.keys(vehicles).length == 0;
+
+  const addFirstVehicle = async (vehicle: any) => {
+    const created = await addVehicle(vehicle);
+    // the successful create closes the setup dialog (the vehicles refetch flips
+    // showSetupDialog); open the optional interview for the new vehicle
+    created?.id && setInterviewVehicle(created);
+    return created;
+  }
 
   return (
     <main
@@ -53,7 +66,12 @@ export default function SignedInPageMain({
         <SetupVehicleDialog
           forced
           show={!!showSetupDialog}
-          onSubmit={addVehicle}
+          onSubmit={addFirstVehicle}
+        />
+        <OnboardingInterview
+          vehicle={interviewVehicle}
+          open={!!interviewVehicle}
+          onOpenChange={(open: boolean) => !open && setInterviewVehicle(undefined)}
         />
       </NoSsr>
     </main>
