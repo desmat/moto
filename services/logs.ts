@@ -1,12 +1,55 @@
 import moment from "moment";
 import { deleteAttachment, getAttachments } from "./attachments";
 import { createStore } from "./stores";
-import { Log, LogTypeMileage, LogTypeService } from "@/types/Log";
+import { Log, LogItem, LogTypeMileage, LogTypeService } from "@/types/Log";
 import { SessionUser } from "@/types/User";
+import { VehicleComponentState } from "@/types/Vehicle";
 
 const store = createStore({
   debug: true,
 });
+
+// Fold a service log's structured items into a vehicle's `components` snapshot (S12).
+// Pure so the admin rebuild script and tests replay the exact same rules saveLog applies:
+// - an item never overwrites a NEWER state entry (`existing.date > log.date`, YYYYMMDD
+//   string compare) — backdated receipts must not clobber fresher state; a same-day
+//   re-log ties and the write wins
+// - `replace` (and `other` with no prior entry, i.e. a first install) sets `detail`
+//   from `item.note || item.name` — that's where "Michelin Anakee Adventure" lives
+// - every applied action refreshes the "last touched" fields: name/action/date/mileage/logId
+export function applyItemsToComponents(
+  components: Record<string, VehicleComponentState> | undefined,
+  items: LogItem[] | undefined,
+  log: Pick<Log, "id" | "date"> & { mileage?: number },
+): Record<string, VehicleComponentState> {
+  const next = { ...(components || {}) };
+
+  for (const item of items || []) {
+    const key = `${item?.key || ""}`.trim();
+    if (!key || !log?.date) continue;
+
+    const existing = next[key];
+    if (existing?.date && existing.date > log.date) continue; // newer state wins
+
+    const action = `${item.action || "other"}`;
+    const installs = action == "replace" || (action == "other" && !existing);
+    const detail = installs ? (item.note || item.name) : existing?.detail;
+    const mileage = typeof log.mileage == "number" && Number.isFinite(log.mileage)
+      ? log.mileage
+      : undefined;
+
+    next[key] = {
+      name: item.name || existing?.name || key,
+      ...detail && { detail },
+      action,
+      date: log.date,
+      ...mileage != undefined && { mileage },
+      logId: log.id,
+    };
+  }
+
+  return next;
+}
 
 export async function getLogs(query: any = {}): Promise<any> {
   console.log("services.logs.getLogs", { query });
@@ -65,16 +108,30 @@ export async function saveLog(data: any, user: SessionUser): Promise<Log | undef
   //   backdated and must never clobber a newer reading
   const isMileageLog = saved?.type == LogTypeMileage;
   const mileage = isMileageLog ? parseFloat(saved.entry) : saved?.mileage;
+  // S12: only SERVICE logs update vehicle.components — hostile/hand-added items[] on a
+  // journal log stays stored-but-inert (the extraction flow always produces "service")
+  const hasComponentItems = saved?.type == LogTypeService && Array.isArray(saved?.items) && saved.items.length > 0;
 
-  if (saved?.vehicleId && (isMileageLog || Number.isFinite(mileage))) {
+  if (saved?.vehicleId && (isMileageLog || Number.isFinite(mileage) || hasComponentItems)) {
     const vehicle = await store.vehicles.get(saved.vehicleId);
 
-    if (vehicle && vehicle.userId == saved.userId && typeof mileage == "number" && Number.isFinite(mileage)
-      && (isMileageLog || mileage > (vehicle.mileage ?? 0))) {
-      await store.vehicles.update({ ...vehicle, mileage, updatedBy: user.id });
-    }
+    if (vehicle && vehicle.userId == saved.userId) {
+      const updateMileage = typeof mileage == "number" && Number.isFinite(mileage)
+        && (isMileageLog || mileage > (vehicle.mileage ?? 0));
+      const components = hasComponentItems
+        ? applyItemsToComponents(vehicle.components, saved.items, saved)
+        : undefined;
 
-    // S12 appends its vehicle.components update here, in this same fetched-vehicle scope
+      if (updateMileage || components) {
+        // one update carries both concerns: latest odometer reading + component state
+        await store.vehicles.update({
+          ...vehicle,
+          ...updateMileage && { mileage },
+          ...components && { components },
+          updatedBy: user.id,
+        });
+      }
+    }
   }
 
   console.log("services.logs.saveLog", { saved });

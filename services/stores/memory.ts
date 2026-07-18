@@ -23,6 +23,10 @@ const gsxr750VehicleId = "vehicle-gsxr750";
 // Next.js runs in the Edge runtime -- and the Edge runtime has no `fs` module. The seeded
 // vehicle also keeps the "add your first vehicle" onboarding dialog from blocking the
 // Playwright suite (it only shows when the user has no vehicles).
+// YYYYMMDD n days ago — keep the seeded vehicle.components dates in lockstep with the
+// relative-dated log seeds they point at (see buildLogSeeds below)
+const seedDate = (daysAgo: number) => moment().subtract(daysAgo, "days").format("YYYYMMDD");
+
 const seed: Partial<Record<StoreEntityName, any[]>> = {
   users: [
     {
@@ -45,6 +49,16 @@ const seed: Partial<Record<StoreEntityName, any[]>> = {
       year: 2021,
       mileage: 18250,
       modifications: ["crash bars", "heated grips"],
+      // S12: the current-setup snapshot the seeded SERVICE logs below (smoke-log-3,
+      // smoke-log-7) would have produced through saveLog — seeded statically because
+      // seeds bypass the service layer, so the vehicle page's "Current setup" card has
+      // rows out of the box
+      components: {
+        "engine-oil": { name: "Engine oil", detail: "Full synthetic 10W-30", action: "replace", date: seedDate(3), logId: "smoke-log-3" },
+        "oil-filter": { name: "Oil filter", detail: "Oil filter", action: "replace", date: seedDate(3), logId: "smoke-log-3" },
+        "front-tire": { name: "Front tire", detail: "Michelin Anakee Adventure", action: "replace", date: seedDate(10), logId: "smoke-log-7" },
+        "rear-tire": { name: "Rear tire", detail: "Michelin Anakee Adventure", action: "replace", date: seedDate(10), logId: "smoke-log-7" },
+      },
     },
     {
       id: smokeTestVehicle2Id,

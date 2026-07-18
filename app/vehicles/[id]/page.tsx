@@ -7,6 +7,7 @@ import JsonEditor from "@/components/json-editor";
 import ScheduleReview from "@/components/schedule-review";
 import SetupVehicleDialog from "@/components/setup-vehicle-dialog";
 import { Button } from "@/components/ui/button";
+import VehicleComponentsCard from "@/components/vehicle-components-card";
 import VehicleDocuments from "@/components/vehicle-documents";
 import { useVehicle } from "@/hooks/use-vehicle";
 
@@ -55,6 +56,7 @@ export default function Page({
       }
       {vehicle &&
         <>
+          <VehicleComponentsCard vehicle={vehicle} />
           <VehicleDocuments vehicleId={id} />
           <ScheduleReview vehicleId={id} />
         </>

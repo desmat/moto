@@ -4,6 +4,9 @@ import moment from 'moment';
 // always talks to real Redis: admin scripts operate on the live store, never the
 // ephemeral in-memory one
 import { createStore } from './stores/redis';
+import { applyItemsToComponents } from './logs';
+import { Log, LogTypeService } from '../types/Log';
+import { Vehicle, VehicleComponentState } from '../types/Vehicle';
 
 const store = createStore({
   debug: true,
@@ -119,6 +122,39 @@ export async function restore(filenameOrUrl: string) {
   return result;
 }
 
+// S12 one-off/recovery: rebuild a user's `vehicle.components` snapshots by replaying
+// their service logs oldest-first through the exact same pure update function saveLog
+// uses (deleting a source log deliberately does NOT cascade, and the JSON editor can
+// hand-mangle the snapshot — this is the way back to a logs-derived state).
+export async function rebuildComponents(userId: string) {
+  console.log('services.admin.rebuildComponents', { userId });
+
+  const logs: Log[] = await store.logs.find({ user: userId });
+  const vehicles: Vehicle[] = await store.vehicles.find({ user: userId });
+
+  const serviceLogs = (logs || [])
+    .filter((log: Log) => log.type == LogTypeService && Array.isArray(log.items) && log.items.length > 0)
+    // oldest-first so the newer-wins rule replays the way it happened (YYYYMMDD string sort)
+    .sort((a: Log, b: Log) => `${a.date}`.localeCompare(`${b.date}`));
+
+  const result = {} as any;
+  for (const vehicle of vehicles || []) {
+    const components = serviceLogs
+      .filter((log: Log) => log.vehicleId == vehicle.id)
+      .reduce(
+        (acc: Record<string, VehicleComponentState>, log: Log) => applyItemsToComponents(acc, log.items, log),
+        {} as Record<string, VehicleComponentState>,
+      );
+
+    await store.vehicles.update({ ...vehicle, components });
+    result[vehicle.id] = Object.keys(components).length;
+  }
+
+  console.log('services.admin.rebuildComponents >>>RESULTS<<<', { result });
+
+  return result;
+}
+
 (async function () {
   // requires an explicit env var so an accidentally-uncommented destructive line below
   // can't run just because `npm run admin` was invoked
@@ -129,6 +165,7 @@ export async function restore(filenameOrUrl: string) {
 
   const ret = await backup();
   // const ret = await restore("https://<blob-store>/backups/motogpt_1.0.0_20260101_000000.json");
+  // const ret = await rebuildComponents("<internal-user-id>");
 
   console.log("services.admin", { ret });
 })();
