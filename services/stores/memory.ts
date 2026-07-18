@@ -71,7 +71,12 @@ const seed: Partial<Record<StoreEntityName, any[]>> = {
       mileage: 9400,
       modifications: [],
     },
-    // added for the manual → schedule seeding pass (see scheduleSeeds below)
+    // added for the manual → schedule seeding pass (see scheduleSeeds below).
+    // Mileage + components are REAL data (user's live store, 2026-07): the components
+    // snapshot is what saveLog would have produced from the two seeded CRF service logs
+    // below (crf receipt logs b7ffa27c / 42391621 — ids kept verbatim so `logId` links
+    // resolve). Dates here are deliberately ABSOLUTE (historical receipts), unlike the
+    // relative CB500X seeds — realistic stale-history input for the S14 status engine.
     {
       id: crf250rlVehicleId,
       createdAt: 1700000001500,
@@ -80,8 +85,26 @@ const seed: Partial<Record<StoreEntityName, any[]>> = {
       maker: "Honda",
       model: "CRF250RL",
       year: 2020,
-      mileage: 3200,
+      mileage: 48184,
       modifications: [],
+      components: {
+        "engine-oil": { name: "Engine oil", detail: "Synthetic 10W-40, 1.6 litres", action: "replace", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "oil-filter": { name: "Oil filter", action: "replace", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "air-filter": { name: "Air filter", action: "replace", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "spark-plugs": { name: "Spark plug", detail: "SIMR8A", action: "replace", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "chain": { name: "Drive chain", detail: "52-link drive chain", action: "replace", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "sprockets": { name: "Drive sprockets", detail: "14-tooth front sprocket and rear sprocket", action: "replace", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "front-tire": { name: "Front tire", detail: "90/90-21 54R Anakee W", action: "replace", date: "20230824", mileage: 37947, logId: "42391621" },
+        "rear-tire": { name: "Rear tire", detail: "Michelin Anakee Wild 120/80-18 62S; tube 500/530-18 TR6", action: "replace", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "clutch": { name: "Clutch plates & springs", action: "replace", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "lights": { name: "Rear reflector", action: "replace", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "coolant": { name: "Coolant level", action: "inspect", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "suspension-rear": { name: "Rear suspension", action: "adjust", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "steering-bearings": { name: "Steering bearings", action: "inspect", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "brake-pads-front": { name: "Brakes", action: "inspect", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "battery": { name: "Battery and charging system", action: "inspect", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+        "general-service": { name: "44,000 km tune-up", action: "other", date: "20241021", mileage: 44049, logId: "b7ffa27c" },
+      },
     },
     {
       id: gsxr750VehicleId,
@@ -157,6 +180,49 @@ function buildLogSeeds(): any[] {
       ],
     }),
     mk(12, "mileage", "17980", "5"),
+    // CRF250RL: the two real receipt-extracted service logs the vehicle's seeded
+    // `components` snapshot points at (ids verbatim from the user's live store so the
+    // snapshot's logId links resolve). Absolute dates on purpose — historical receipts.
+    {
+      id: "42391621",
+      createdAt: moment("20230824", "YYYYMMDD").hour(10).valueOf(),
+      userId: smokeTestUserId,
+      vehicleId: crf250rlVehicleId,
+      type: "service",
+      date: "20230824",
+      entry: "Front tire — 90/90-21 54R Anakee W",
+      mileage: 37947,
+      items: [
+        { key: "front-tire", name: "Front tire", action: "replace", note: "90/90-21 54R Anakee W" },
+      ],
+    },
+    {
+      id: "b7ffa27c",
+      createdAt: moment("20241021", "YYYYMMDD").hour(10).valueOf(),
+      userId: smokeTestUserId,
+      vehicleId: crf250rlVehicleId,
+      type: "service",
+      date: "20241021",
+      entry: "44,000 km tune-up — Engine oil, Oil filter, Air filter +13 more",
+      mileage: 44049,
+      items: [
+        { key: "engine-oil", name: "Engine oil", action: "replace", note: "Synthetic 10W-40, 1.6 litres" },
+        { key: "oil-filter", name: "Oil filter", action: "replace" },
+        { key: "air-filter", name: "Air filter", action: "replace" },
+        { key: "spark-plugs", name: "Spark plug", action: "replace", note: "SIMR8A" },
+        { key: "chain", name: "Drive chain", action: "replace", note: "52-link drive chain" },
+        { key: "sprockets", name: "Drive sprockets", action: "replace", note: "14-tooth front sprocket and rear sprocket" },
+        { key: "rear-tire", name: "Rear tire", action: "replace", note: "Michelin Anakee Wild 120/80-18 62S; tube 500/530-18 TR6" },
+        { key: "clutch", name: "Clutch plates & springs", action: "replace" },
+        { key: "lights", name: "Rear reflector", action: "replace" },
+        { key: "coolant", name: "Coolant level", action: "inspect" },
+        { key: "suspension-rear", name: "Rear suspension", action: "adjust" },
+        { key: "steering-bearings", name: "Steering bearings", action: "inspect" },
+        { key: "brake-pads-front", name: "Brakes", action: "inspect" },
+        { key: "battery", name: "Battery and charging system", action: "inspect" },
+        { key: "general-service", name: "44,000 km tune-up", action: "other" },
+      ],
+    },
   ];
 }
 
