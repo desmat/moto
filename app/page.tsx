@@ -2,9 +2,11 @@
 
 import { sortBy } from "@desmat/utils";
 import { formatTimeFromNow } from "@desmat/utils/format";
-import { Gauge, NotebookPen, Paperclip, Wrench } from "lucide-react";
+import { Gauge, NotebookPen, Paperclip, Wrench, X } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import LogEntryDialog, { LogEntryMode } from "@/components/log-entry-dialog";
+import OnboardingInterview from "@/components/onboarding-interview";
 import ServiceLogDialog from "@/components/service-log-dialog";
 // charts deliberately disabled for now (they render dummy data) -- revive these imports
 // and the Charts section below once real reporting lands (roadmap 4.2, via the unused
@@ -16,8 +18,13 @@ import { Button } from "@/components/ui/button";
 import { useLog } from "@/hooks/use-log";
 import { useUser } from "@/hooks/use-user";
 import { useVehicle } from "@/hooks/use-vehicle";
+import { fromLocalStorage, toLocalStorage } from "@/services/localstorage";
 import { LogTypeJournal, LogTypeMileage, LogTypeService } from "@/types/Log";
 import { vehicleName } from "@/types/Vehicle";
+
+// dismissed finish-setup cards, remembered per vehicle id in ONE localStorage map —
+// a one-time UI nudge, deliberately not a persisted record field (S13)
+const setupDismissedKey = "moto:onboarding:dismissed";
 
 function logIcon(type: string) {
   return type == LogTypeJournal
@@ -40,6 +47,11 @@ export default function Page() {
   } = useLog();
 
   const loaded = userLoaded && vehiclesLoaded && logsLoaded;
+
+  // finish-setup (S13): per-vehicle dismissals + the vehicle an interview is open for
+  const [setupDismissed, setSetupDismissed] = useState<Record<string, boolean>>(
+    () => fromLocalStorage(setupDismissedKey) || {});
+  const [interviewVehicle, setInterviewVehicle] = useState<any>();
 
   const latestLogs = logsLoaded && logs &&
     Object.values(logs)
@@ -68,6 +80,21 @@ export default function Page() {
     console.log("app.page.Page.recordLog", { ret });
   }
 
+  // vehicles with no logs at all get a dismissible "finish setting up" card that
+  // re-offers the S13 interview. Zero-logs is judged against the dashboard's loaded
+  // (newest-first, capped) log window — a deliberate heuristic: a false positive is a
+  // dismissible nudge, not a data problem
+  const loggedVehicleIds = new Set((latestLogs || []).map((log: any) => log.vehicleId));
+  const setupVehicles = loaded && vehicles
+    ? Object.values(vehicles).filter((vehicle: any) =>
+      !loggedVehicleIds.has(vehicle.id) && !setupDismissed[vehicle.id])
+    : [];
+
+  const dismissSetup = (vehicleId: string) => {
+    toLocalStorage(setupDismissedKey, { [vehicleId]: true });
+    setSetupDismissed((previous) => ({ ...previous, [vehicleId]: true }));
+  }
+
   const recordButtons: { mode: LogEntryMode, label: string }[] = [
     { mode: "journal", label: "Journal Entry" },
     { mode: "mileage", label: "Current Mileage" },
@@ -81,6 +108,33 @@ export default function Page() {
         <span className="ml-[-1rem] text-[1.2rem]">🤖 </span>
         <span className="italic">Looking good! Keep logging your rides and maintenance and I&apos;ll keep an eye on what&apos;s due next.</span>
       </div>
+
+      {(setupVehicles as any[]).map((vehicle: any) => (
+        <div
+          key={vehicle.id}
+          className="flex w-full max-w-[28rem] flex-row items-center gap-2 rounded-lg border border-input px-3 py-2"
+        >
+          <button
+            type="button"
+            className="flex-1 text-left text-sm hover:underline"
+            onClick={() => setInterviewVehicle(vehicle)}
+          >
+            Finish setting up your {vehicleName(vehicle)} — 2 min
+          </button>
+          <button
+            type="button"
+            aria-label={`Dismiss setup for ${vehicleName(vehicle)}`}
+            onClick={() => dismissSetup(vehicle.id)}
+          >
+            <X className="h-4 w-4 opacity-60 hover:opacity-100" />
+          </button>
+        </div>
+      ))}
+      <OnboardingInterview
+        vehicle={interviewVehicle}
+        open={!!interviewVehicle}
+        onOpenChange={(open: boolean) => !open && setInterviewVehicle(undefined)}
+      />
 
       <div className="flex flex-row gap-2">
         <b>Record</b>

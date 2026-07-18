@@ -53,6 +53,77 @@ function loadMocks(): Record<string, any> {
   return mocks!;
 }
 
+// A chat message as the Chat Completions API takes it. `content` is `any` on purpose:
+// text-only turns pass a string, extractFromImage passes the SDK's content-part arrays.
+export type ChatMessage = {
+  role: "system" | "user" | "assistant",
+  content: any,
+};
+
+// Shared real-call internals for the structured-output helpers (extractFromImage +
+// chatJSON): one chat completion with response_format json_schema (strict), parsed. The
+// mock branches stay in the callers — extractFromImage's is a static lookup while
+// chatJSON's walks a script — but the OpenAI plumbing must not drift apart.
+async function completeJSON<T>({ messages, schemaName, schema, model, reasoningEffort, context }: {
+  messages: ChatMessage[],
+  schemaName: string,
+  schema: Record<string, unknown>,
+  model?: string,
+  reasoningEffort?: ReasoningEffort,
+  context: string, // caller name for error wrapping, e.g. "services.ai.chatJSON"
+}): Promise<T> {
+  try {
+    const completion = await getClient().chat.completions.create({
+      model: model || MODELS.vision,
+      ...(reasoningEffort && { reasoning_effort: reasoningEffort as any }),
+      messages: messages as any,
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: schemaName, strict: true, schema },
+      },
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("empty response");
+    }
+    return JSON.parse(content) as T;
+  } catch (err: any) {
+    // wrap with context; routes turn thrown errors into 5xx JSON
+    throw new Error(`${context}(${schemaName}): ${err.message}`);
+  }
+}
+
+// Text-only structured chat (S13): a whole conversation in, one strict-JSON turn out —
+// extractFromImage minus the image. In mock mode a scripted conversation is supported:
+// when the ai-mocks.json entry for schemaName is an ARRAY, it's a turn-by-turn script
+// indexed by how many `user` messages the transcript holds (0 answers → first turn),
+// sticking on the last turn once the script is exhausted.
+export async function chatJSON<T>({ messages, schemaName, schema, model, reasoningEffort }: {
+  messages: ChatMessage[],
+  schemaName: string, // doubles as the json_schema name and the ai-mocks.json key
+  schema: Record<string, unknown>, // plain JSON Schema (deliberately not zod — not a dependency)
+  model?: string,
+  reasoningEffort?: ReasoningEffort,
+}): Promise<T> {
+  console.log("services.ai.chatJSON", { schemaName, messageCount: messages.length, model: model || MODELS.vision, reasoningEffort });
+
+  if (mock()) {
+    const mocks = loadMocks();
+    if (!(schemaName in mocks)) {
+      throw new Error(`services.ai.chatJSON(${schemaName}): no mock registered in test/fixtures/ai-mocks.json (AI_MOCK=true)`);
+    }
+    const canned = mocks[schemaName];
+    if (Array.isArray(canned)) {
+      const userMessageCount = messages.filter((message) => message.role == "user").length;
+      return canned[Math.min(userMessageCount, canned.length - 1)] as T;
+    }
+    return canned as T;
+  }
+
+  return completeJSON<T>({ messages, schemaName, schema, model, reasoningEffort, context: "services.ai.chatJSON" });
+}
+
 export async function extractFromImage<T>({ imageUrl, imageUrls, prompt, schemaName, schema, model, reasoningEffort }: {
   imageUrl?: string,   // blob URL (public-but-unguessable) — passed straight to OpenAI, no re-download
   imageUrls?: string[], // multi-image alternative (e.g. a receipt photographed page by
@@ -80,34 +151,22 @@ export async function extractFromImage<T>({ imageUrl, imageUrls, prompt, schemaN
     return mocks[schemaName] as T;
   }
 
-  try {
-    const completion = await getClient().chat.completions.create({
-      model: model || MODELS.vision,
-      ...(reasoningEffort && { reasoning_effort: reasoningEffort as any }),
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            ...urls.map((url) => ({ type: "image_url" as const, image_url: { url } })),
-          ],
-        },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: { name: schemaName, strict: true, schema },
+  return completeJSON<T>({
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          ...urls.map((url) => ({ type: "image_url" as const, image_url: { url } })),
+        ],
       },
-    });
-
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error("empty response");
-    }
-    return JSON.parse(content) as T;
-  } catch (err: any) {
-    // wrap with context; routes turn thrown errors into 5xx JSON
-    throw new Error(`services.ai.extractFromImage(${schemaName}): ${err.message}`);
-  }
+    ],
+    schemaName,
+    schema,
+    model,
+    reasoningEffort,
+    context: "services.ai.extractFromImage",
+  });
 }
 
 // Whole-file extraction (S10): upload the file to the OpenAI Files API, reference it as

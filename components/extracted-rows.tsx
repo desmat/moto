@@ -12,15 +12,18 @@ import { Input } from "@/components/ui/input"
 export type ExtractedRowsColumn = {
   label: string,
   field: string,
-  type: "text" | "number" | "select",
+  // "badge" is read-only: renders a muted pill (the column label, lowercased) when the
+  // row's field is truthy — e.g. S13's estimated-flag column on proposed logs
+  type: "text" | "number" | "select" | "badge",
   options?: string[],   // for type "select"
   width?: string,       // optional CSS width (e.g. "6rem") for the column
 };
 
-export default function ExtractedRows({ columns, rows, onChange }: {
+export default function ExtractedRows({ columns, rows, onChange, allowAdd = true }: {
   columns: ExtractedRowsColumn[],
   rows: any[],
   onChange: (rows: any[]) => void,
+  allowAdd?: boolean,   // hide the add-row button for fixed-set reviews (S13)
 }) {
   const setCell = (rowIndex: number, field: string, raw: string, type: ExtractedRowsColumn["type"]) => {
     const value = type == "number"
@@ -60,7 +63,13 @@ export default function ExtractedRows({ columns, rows, onChange }: {
               <tr key={rowIndex}>
                 {columns.map((column) => (
                   <td key={column.field} className="p-1 align-top">
-                    {column.type == "select"
+                    {column.type == "badge"
+                      ? (row[column.field]
+                        ? <span className="inline-block rounded bg-muted px-1.5 py-1 text-xs text-muted-foreground">
+                            {column.label.toLowerCase()}
+                          </span>
+                        : null)
+                      : column.type == "select"
                       ? <select
                           aria-label={column.label}
                           className="flex h-9 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-sm"
@@ -95,12 +104,14 @@ export default function ExtractedRows({ columns, rows, onChange }: {
           </tbody>
         </table>
       </div>
-      <div>
-        <Button variant="outline" size="sm" onClick={addRow}>
-          <Plus />
-          Add row
-        </Button>
-      </div>
+      {allowAdd &&
+        <div>
+          <Button variant="outline" size="sm" onClick={addRow}>
+            <Plus />
+            Add row
+          </Button>
+        </div>
+      }
     </div>
   )
 }

@@ -36,6 +36,63 @@
       }
     ]
   },
+  "onboarding": [
+    {
+      "message": "Nice ride! Let's get it set up — what's the current mileage on the odometer?",
+      "done": false,
+      "suggestUpload": false,
+      "proposal": { "mileage": null, "logs": [] }
+    },
+    {
+      "message": "Got it, 12,800 km. When did you last change the engine oil? A rough guess is fine.",
+      "done": false,
+      "suggestUpload": false,
+      "proposal": {
+        "mileage": 12800,
+        "logs": [
+          { "type": "mileage", "date": "20260701", "entry": "12800", "items": [], "mileage": 12800, "estimated": false }
+        ]
+      }
+    },
+    {
+      "message": "Thanks — I'll note that oil change as an estimate. Anything else recent, like the chain, tires, or brakes? If you have the owner's manual as a PDF you can upload it now too.",
+      "done": false,
+      "suggestUpload": true,
+      "proposal": {
+        "mileage": 12800,
+        "logs": [
+          {
+            "type": "service",
+            "date": "20260315",
+            "entry": "Oil change (estimated from onboarding interview)",
+            "items": [{ "key": "engine-oil", "name": "Engine oil", "action": "replace", "note": null }],
+            "mileage": 10800,
+            "estimated": true
+          },
+          { "type": "mileage", "date": "20260701", "entry": "12800", "items": [], "mileage": 12800, "estimated": false }
+        ]
+      }
+    },
+    {
+      "message": "That's everything I need — here's what I'll record. Review and confirm below.",
+      "done": true,
+      "suggestUpload": false,
+      "proposal": {
+        "mileage": 12800,
+        "logs": [
+          {
+            "type": "service",
+            "date": "20260315",
+            "entry": "Oil change (estimated from onboarding interview)",
+            "items": [{ "key": "engine-oil", "name": "Engine oil", "action": "replace", "note": null }],
+            "mileage": 10800,
+            "estimated": true
+          },
+          { "type": "mileage", "date": "20260701", "entry": "12800", "items": [], "mileage": 12800, "estimated": false }
+        ]
+      }
+    }
+  ],
   "pageTranscription": {
     "page_text_clearly_legible": true,
     "text": "Mock page transcription: check tire pressure weekly.\n\nKeep chain lubricated every 500 km."
