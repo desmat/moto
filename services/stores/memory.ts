@@ -55,7 +55,7 @@ const seed: Partial<Record<StoreEntityName, any[]>> = {
       // rows out of the box
       components: {
         "engine-oil": { name: "Engine oil", detail: "Full synthetic 10W-30", action: "replace", date: seedDate(3), logId: "smoke-log-3" },
-        "oil-filter": { name: "Oil filter", detail: "Oil filter", action: "replace", date: seedDate(3), logId: "smoke-log-3" },
+        "oil-filter": { name: "Oil filter", action: "replace", date: seedDate(3), logId: "smoke-log-3" },
         "front-tire": { name: "Front tire", detail: "Michelin Anakee Adventure", action: "replace", date: seedDate(10), logId: "smoke-log-7" },
         "rear-tire": { name: "Rear tire", detail: "Michelin Anakee Adventure", action: "replace", date: seedDate(10), logId: "smoke-log-7" },
       },

@@ -15,7 +15,8 @@ const store = createStore({
 //   string compare) — backdated receipts must not clobber fresher state; a same-day
 //   re-log ties and the write wins
 // - `replace` (and `other` with no prior entry, i.e. a first install) sets `detail`
-//   from `item.note || item.name` — that's where "Michelin Anakee Adventure" lives
+//   from `item.note` — that's where "Michelin Anakee Adventure" lives; no name
+//   fallback (the name renders on the card anyway, a copy in detail is just noise)
 // - every applied action refreshes the "last touched" fields: name/action/date/mileage/logId
 export function applyItemsToComponents(
   components: Record<string, VehicleComponentState> | undefined,
@@ -33,7 +34,7 @@ export function applyItemsToComponents(
 
     const action = `${item.action || "other"}`;
     const installs = action == "replace" || (action == "other" && !existing);
-    const detail = installs ? (item.note || item.name) : existing?.detail;
+    const detail = installs ? item.note : existing?.detail;
     const mileage = typeof log.mileage == "number" && Number.isFinite(log.mileage)
       ? log.mileage
       : undefined;
@@ -74,19 +75,17 @@ export async function saveLog(data: any, user: SessionUser): Promise<Log | undef
   };
 
   // a service log saved without notes still deserves a readable entry (lists render
-  // log.entry): compose one from its structured data — item names up to a budget (real
-  // shop invoices run 25+ lines; a full join floods the entries list), then "+N more",
-  // plus the vendor when known. User-typed notes always win; done here in the service
-  // so every entrance (receipt dialog, API, S13's proposed logs) gets it.
+  // log.entry): compose one from its structured data — the first 3 item names, then
+  // "+N more" (real shop invoices run 25+ lines; a full join floods the entries
+  // list; visual overflow is the renderers' job, so no literal ellipsis here), plus
+  // the vendor when known. User-typed notes always win; done
+  // here in the service so every entrance (receipt dialog, API, S13's proposed logs)
+  // gets it.
   if (log.type == LogTypeService && !log.entry && Array.isArray(log.items) && log.items.length) {
     const names = log.items.map((item: any) => `${item?.name || item?.key || ""}`.trim()).filter(Boolean);
-    const ENTRY_BUDGET = 90;
-    const shown: string[] = [];
-    for (const name of names) {
-      if (shown.length && shown.join(", ").length + name.length > ENTRY_BUDGET) break;
-      shown.push(name);
-    }
-    const summary = shown.join(", ") + (names.length > shown.length ? ` +${names.length - shown.length} more` : "");
+    const shown = names.slice(0, 3);
+    const summary = shown.join(", ")
+      + (names.length > shown.length ? ` +${names.length - shown.length} more` : "");
     log.entry = [summary, log.vendor].filter(Boolean).join(" — ");
   }
 

@@ -56,6 +56,7 @@ export const CANONICAL_COMPONENT_KEYS = [
   "valve-clearance",
   "coolant",
   "chain",
+  "sprockets",
   "clutch",
   "throttle",
   "front-tire",

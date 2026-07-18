@@ -178,7 +178,7 @@ test('a service log saved without notes gets an entry composed from its items + 
   const { log: noVendorLog } = await noVendorRes.json();
   expect(noVendorLog?.entry).toBe('Drive chain');
 
-  // a real 25-line invoice must not flood the entry: capped names + "+N more"
+  // a real 25-line invoice must not flood the entry: first 3 names + "+N more"
   const manyItems = Array.from({ length: 25 }, (_, i) => ({
     key: `part-${i}`, name: `Replacement part number ${i}`, action: 'replace',
   }));
@@ -188,7 +188,8 @@ test('a service log saved without notes gets an entry composed from its items + 
     },
   });
   const { log: manyLog } = await manyRes.json();
-  expect(manyLog?.entry).toMatch(/\+\d+ more — Big Invoice Shop$/);
+  expect(manyLog?.entry).toBe(
+    'Replacement part number 0, Replacement part number 1, Replacement part number 2 +22 more — Big Invoice Shop');
   expect(manyLog?.entry.length).toBeLessThan(200);
 
   // user-typed notes always win

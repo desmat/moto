@@ -70,7 +70,7 @@ const receiptSchema = {
     },
     mileage: {
       type: ["number", "null"],
-      description: "The vehicle's odometer reading IF it is printed on the receipt (shops often print it). Only a value actually printed — NEVER inferred or estimated. null when the receipt shows no odometer reading.",
+      description: "The vehicle's odometer reading IF it is printed on the receipt (shops often print it as 'KM OUT' / 'mileage out' / odometer near the vehicle details — prefer the OUT value when in/out are both shown). Transcribe the digits carefully, including thousands separators (\"37,947\" → 37947). Only a value actually printed — NEVER inferred or estimated. null when the receipt shows no odometer reading.",
     },
     totalCost: {
       type: ["number", "null"],
@@ -78,7 +78,7 @@ const receiptSchema = {
     },
     items: {
       type: "array",
-      description: "One entry per service/parts line printed on the receipt. MUST be empty when receipt_clearly_visible is false.",
+      description: "One entry per COMPONENT the shop actually serviced — synthesized from the receipt's lines, NOT a line-by-line transcription. MUST be empty when receipt_clearly_visible is false.",
       items: {
         type: "object",
         properties: {
@@ -88,20 +88,20 @@ const receiptSchema = {
           },
           name: {
             type: "string",
-            description: "The line item's component/service name as the receipt phrases it.",
+            description: "Short, clean component name in English, capitalized like a sentence — \"Front tire\", \"Engine oil & filter\", \"Drive chain & sprockets\" — NOT the receipt's raw line text, part numbers, or all-caps phrasing.",
           },
           action: {
             type: "string",
             enum: [...ReceiptItemActions],
-            description: "What was done to the component on this line. Use \"other\" only when none fit.",
+            description: "What was done to the component. Use \"other\" only when none fit.",
           },
           note: {
             type: ["string", "null"],
-            description: "Brand/part/detail printed on the line that didn't fit the structured fields (e.g. \"Michelin Anakee Adventure\" for a tire line, part numbers, grades). null if nothing to add.",
+            description: "Brand/spec detail worth keeping, cleaned up (e.g. \"Michelin Anakee Wild 90/90-21 54R\", \"GN4 10W-30\"). null if nothing meaningful to add.",
           },
           cost: {
             type: ["number", "null"],
-            description: "This line's printed price. null when the receipt shows no per-line price.",
+            description: "The printed total for this component's work — when the receipt groups a job (labor + part + consumables), the group's printed total; otherwise the line price. null when no usable printed figure exists for it.",
           },
         },
         required: ["key", "name", "action", "note", "cost"],
@@ -121,9 +121,14 @@ If the receipt is legible:
 - date: the service/invoice date, converted from whatever format is printed to YYYYMMDD.
 - vendor: the shop or vendor name as printed.
 - vehicle: the vehicle description printed near the customer/vehicle details (year, make, model, sometimes plate or VIN), exactly as printed. null when the receipt identifies no vehicle.
-- mileage: the vehicle's odometer reading ONLY if it is printed on the receipt (shops often print it near the vehicle details). Never infer one.
+- mileage: the vehicle's odometer reading ONLY if it is printed on the receipt (near the vehicle details; when the shop prints mileage IN and OUT, use OUT). Transcribe the digits carefully — "37,947 Km" is 37947. Never infer one.
 - totalCost: the grand total as printed, taxes and fees included.
-- items: one entry per service or parts line. Do NOT emit line items for taxes, fees, or shop-supplies/consumables surcharge lines — those belong only in the grand total. Put brand/part detail in note (a "Front tire — Michelin Anakee Adventure" line gets name "Front tire" and note "Michelin Anakee Adventure"). For key, STRONGLY prefer one of: ${CANONICAL_COMPONENT_KEYS.join(", ")}; only mint a new kebab-case slug when none of those fit. action is what was done on that line (replace, inspect, adjust, lubricate, clean, or other). cost is that line's printed price, null when no per-line price is shown.`;
+- items: SYNTHESIZE the maintenance actually performed, one entry per component serviced — do NOT transcribe invoice lines one-for-one. Shop invoices scatter one job across several lines (labor, the part, consumables, taxes-per-part); fold them into a single item per component. A front-tire change billed as install labor + the tire + tire tax + wheel weights is ONE item: key "front-tire", name "Front tire", action "replace", note with the tire's brand/size (e.g. "Michelin Anakee Wild 90/90-21 54R"), cost = that job's printed group total (or the sum of its printed lines). Engine oil and the oil filter are SEPARATE components: an oil change billed as oil + filter + drain gasket + labor becomes an "engine-oil" item (name "Engine oil", the oil's brand/grade in note) AND an "oil-filter" item (name "Oil filter") — split the job's cost sensibly when the parts are priced separately, else put the group total on "engine-oil" and leave the filter's cost null.
+  Real one-off repair jobs DO become items even when they don't map to a maintenance component — a windshield repair or securing a loose dashboard is an item (mint a slug like "windshield" or "dashboard", action "other", name describing the fix, cost = that job's printed total including its labor and hardware).
+  OMIT entirely: taxes, environmental/recycling fees, shop supplies, deposits, administrative lines, and hardware/labor lines that belong inside some job's grouped total.
+  Tune-up/scheduled-service checklists: inspections of REAL serviceable components keep their own "inspect" items — battery/charging system, brakes, coolant/anti-freeze level, steering bearings, suspension, air filter, tire pressure-and-condition (fold pressure checks into the tire items only when the tires were also replaced). Fold only the generic lines into the service's umbrella item (key "general-service", name like "44,000 km tune-up"): fastener/clip checks, general lubrication, visual/safety inspection, idle check, road test. A component actually REPLACED inside a package deal (its parts appear on the invoice — oil, a filter element, a spark plug) always keeps its own item, even when the package price covers the labor.
+  The drive chain and the sprockets are SEPARATE components: a chain-and-sprockets job becomes a "chain" item (chain spec in note) and a "sprockets" item (front/rear teeth in note), each with its own printed part cost.
+  name: short clean English ("Front tire", "Clutch plates & springs"), never the receipt's raw all-caps text or part numbers — translate French receipts. note: cleaned-up brand/spec detail worth keeping, null otherwise. For key, STRONGLY prefer one of: ${CANONICAL_COMPONENT_KEYS.join(", ")}; only mint a new kebab-case slug when none of those fit. action is what was done (replace, inspect, adjust, lubricate, clean, or other).`;
 
 // server-side companion to the prompt's key guidance (strict mode can't enforce the
 // vocabulary): lowercase kebab-case slug of whatever came back — same helper pattern as
@@ -181,7 +186,9 @@ export async function readReceipt(imageUrls: string[]): Promise<ReceiptReading> 
     schemaName: "receipt",
     schema: receiptSchema,
     // no model override on purpose: the default (MODELS.vision) until a real-key
-    // comparison says otherwise
+    // comparison says otherwise. Low reasoning effort helps the synthesis step
+    // (grouping invoice lines into per-component work) and digit transcription.
+    reasoningEffort: "low",
   });
 
   return normalizeReceipt(extracted);

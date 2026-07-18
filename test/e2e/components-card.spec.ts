@@ -65,9 +65,9 @@ test('service logs produce a Current setup card on the vehicle page; the date li
   await expect(page.getByText('Rear tire', { exact: true })).toBeVisible();
   await expect(page.getByText('Engine oil', { exact: true })).toBeVisible();
   // installed detail shows on the tire rows
-  await expect(page.getByText('Michelin Anakee Adventure', { exact: true }).first()).toBeVisible();
-  // last-touched line carries action + mileage
-  await expect(page.getByText('last: replace · ').first()).toBeVisible();
+  await expect(page.getByText('- Michelin Anakee Adventure', { exact: true }).first()).toBeVisible();
+  // the action renders in parens next to the name
+  await expect(page.getByText('(replaced)').first()).toBeVisible();
   await expect(page.getByText('4800 km')).toBeVisible();
 
   // the row's date links to the source log; both source logs are linked
