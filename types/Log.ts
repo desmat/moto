@@ -27,6 +27,12 @@ export type Log = {
   mileage?: number;       // odometer reading, e.g. printed on a service receipt
   vendor?: string;
   totalCost?: number;
+  // S14: schedule keys the write-time classifier mapped this journal/custom log's free
+  // text onto (["chain"] for "lubed the chain"), so the maintenance engine only ever
+  // does key equality at read time. Possibly empty (= classified, nothing matched);
+  // absent = never classified. Hand-correctable via the JSON editor — saveLog skips
+  // re-classification whenever the incoming payload already carries scheduleKeys.
+  scheduleKeys?: string[];
 };
 
 export const LogOptions = {
@@ -37,7 +43,7 @@ export const LogOptions = {
     type: "type",
   },
   hardDelete: true,
-  fieldDisplayOrder: ["id", "createdAt", "createdBy", "updatedAt", "updatedBy", "userId", "vehicleId", "type", "date", "entry", "vendor", "mileage", "items", "totalCost"],
+  fieldDisplayOrder: ["id", "createdAt", "createdBy", "updatedAt", "updatedBy", "userId", "vehicleId", "type", "date", "entry", "vendor", "mileage", "items", "totalCost", "scheduleKeys"],
 };
 
 // built-in log types; anything else is a user-entered custom type

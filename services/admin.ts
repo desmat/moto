@@ -4,8 +4,9 @@ import moment from 'moment';
 // always talks to real Redis: admin scripts operate on the live store, never the
 // ephemeral in-memory one
 import { createStore } from './stores/redis';
-import { applyItemsToComponents } from './logs';
-import { Log, LogTypeService } from '../types/Log';
+import { applyItemsToComponents, classifyLogScheduleKeys } from './logs';
+import { MaintenanceSchedule } from '../types/MaintenanceSchedule';
+import { Log, LogTypeMileage, LogTypeService } from '../types/Log';
 import { Vehicle, VehicleComponentState } from '../types/Vehicle';
 
 const store = createStore({
@@ -155,6 +156,56 @@ export async function rebuildComponents(userId: string) {
   return result;
 }
 
+// S14 one-time backfill: run the write-time classifier (services/logs.ts's
+// classifyLogScheduleKeys — a real OpenAI call per log unless AI_MOCK=true) over a
+// user's pre-existing journal/custom logs so the maintenance engine can match them.
+// IDEMPOTENT: any log already carrying scheduleKeys (even []) is skipped, so re-runs
+// only touch logs the previous run missed; results are written back including empty
+// matches (the "classified, nothing matched" marker saveLog also writes). Logs on
+// vehicles without a CONFIRMED schedule are left alone (nothing to classify against —
+// they'll be picked up by a later run once a schedule is confirmed).
+export async function backfillScheduleKeys(userId: string) {
+  console.log('services.admin.backfillScheduleKeys', { userId });
+
+  const logs: Log[] = await store.logs.find({ user: userId }) || [];
+  const schedules: MaintenanceSchedule[] = await store.schedules.find({ user: userId }) || [];
+
+  // confirmed schedule keys per vehicle (at most one confirmed schedule per vehicle)
+  const keysByVehicle: Record<string, string[]> = {};
+  for (const schedule of schedules) {
+    if (schedule.status == 'confirmed') {
+      keysByVehicle[schedule.vehicleId] = Array.from(new Set(
+        (schedule.items || []).map((item) => `${item.key || ''}`.trim()).filter(Boolean)
+      ));
+    }
+  }
+
+  const result = { classified: 0, matched: 0, skipped: 0, noSchedule: 0 } as any;
+  for (const log of logs) {
+    if (log.type == LogTypeMileage || log.type == LogTypeService || !`${log.entry || ''}`.trim()) continue;
+    if (Array.isArray(log.scheduleKeys)) {
+      result.skipped++;
+      continue;
+    }
+
+    const keys = keysByVehicle[log.vehicleId];
+    if (!keys?.length) {
+      result.noSchedule++;
+      continue;
+    }
+
+    const scheduleKeys = await classifyLogScheduleKeys(log.entry, keys);
+    await store.logs.update({ ...log, scheduleKeys });
+    result.classified++;
+    if (scheduleKeys.length) result.matched++;
+    console.log('services.admin.backfillScheduleKeys', { id: log.id, date: log.date, scheduleKeys });
+  }
+
+  console.log('services.admin.backfillScheduleKeys >>>RESULTS<<<', { result });
+
+  return result;
+}
+
 (async function () {
   // requires an explicit env var so an accidentally-uncommented destructive line below
   // can't run just because `npm run admin` was invoked
@@ -166,6 +217,7 @@ export async function rebuildComponents(userId: string) {
   const ret = await backup();
   // const ret = await restore("https://<blob-store>/backups/motogpt_1.0.0_20260101_000000.json");
   // const ret = await rebuildComponents("<internal-user-id>");
+  // const ret = await backfillScheduleKeys("<internal-user-id>");
 
   console.log("services.admin", { ret });
 })();

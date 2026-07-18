@@ -1,7 +1,10 @@
 import moment from "moment";
+import { ChatMessage, chatJSON } from "./ai";
 import { deleteAttachment, getAttachments } from "./attachments";
+import { getSchedules } from "./schedules";
 import { createStore } from "./stores";
 import { Log, LogItem, LogTypeMileage, LogTypeService } from "@/types/Log";
+import { MaintenanceSchedule } from "@/types/MaintenanceSchedule";
 import { SessionUser } from "@/types/User";
 import { VehicleComponentState } from "@/types/Vehicle";
 
@@ -52,6 +55,56 @@ export function applyItemsToComponents(
   return next;
 }
 
+// S14 write-time classifier schema. Strict mode, and — like S13's turn schema —
+// deliberately NO leading boolean visibility gate: that pattern guards image
+// extraction against hallucinating unseen pixels; here the input is the user's own
+// words. `scheduleKeys` items are plain strings (strict mode forbids a dynamic enum),
+// so classifyLogScheduleKeys filters the response against the real schedule keys.
+const logClassifierSchema = {
+  type: "object",
+  properties: {
+    scheduleKeys: {
+      type: "array",
+      description: "The schedule keys (from the provided list, verbatim) whose maintenance the entry says was actually performed. Empty when none apply.",
+      items: { type: "string" },
+    },
+  },
+  required: ["scheduleKeys"],
+  additionalProperties: false,
+};
+
+const LOG_CLASSIFIER_PROMPT = `You classify a motorcycle owner's free-text log entry against their maintenance schedule.
+
+The user message is JSON: { "entry": <the log text>, "keys": <the schedule's component keys> }.
+
+Return the keys whose maintenance work the entry says WAS PERFORMED (e.g. "lubed and adjusted the chain" → chain). Rules:
+- Only return keys from the provided list, verbatim.
+- Only work that was done — not plans, questions, or observations ("should do the valves soon", "brake lever feels spongy" match nothing).
+- When nothing applies, return an empty list.`;
+
+// One cheap chatJSON call mapping free text onto the vehicle's schedule keys — the AI
+// gap-filler that keeps the maintenance engine (lib/maintenance.ts) pure key equality
+// at read time. Exported for services/admin.ts's backfill, which replays it over
+// pre-existing logs. Under AI_MOCK this is a deterministic keyword match computed in
+// services/ai.ts (mockLogClassifier — hence the JSON-payload user message).
+export async function classifyLogScheduleKeys(entry: string, keys: string[]): Promise<string[]> {
+  const messages: ChatMessage[] = [
+    { role: "system", content: LOG_CLASSIFIER_PROMPT },
+    { role: "user", content: JSON.stringify({ entry, keys }) },
+  ];
+
+  const result = await chatJSON<{ scheduleKeys: string[] }>({
+    messages,
+    schemaName: "logClassifier",
+    schema: logClassifierSchema,
+    // default model; a classification needs no deliberation and should stay chat-cheap
+    reasoningEffort: "none",
+  });
+
+  // only keys actually on the schedule count (strict mode can't enforce the vocabulary)
+  return (result.scheduleKeys || []).filter((key) => keys.includes(key));
+}
+
 export async function getLogs(query: any = {}): Promise<any> {
   console.log("services.logs.getLogs", { query });
 
@@ -91,7 +144,7 @@ export async function saveLog(data: any, user: SessionUser): Promise<Log | undef
 
   const exists = log.id && await store.logs.exists(log.id);
 
-  const saved = await store.logs[exists ? "update" : "create"]({
+  let saved = await store.logs[exists ? "update" : "create"]({
     ...log,
     ...!exists && { userId: user.id },
     [exists ? "updatedBy" : "createdBy"]: user.id,
@@ -130,6 +183,31 @@ export async function saveLog(data: any, user: SessionUser): Promise<Log | undef
           updatedBy: user.id,
         });
       }
+    }
+  }
+
+  // S14 write-time classifier: journal/custom free-text logs don't carry structured
+  // items, so when the vehicle has a CONFIRMED schedule, one chatJSON call maps the
+  // entry text onto its keys → log.scheduleKeys (possibly [] — "classified, nothing
+  // matched" — which also marks the log done for the admin backfill). Skipped for
+  // service logs (they carry items) and mileage logs (digits), when there's no
+  // confirmed schedule, and when the INCOMING payload already carries scheduleKeys —
+  // that's how JSON-editor hand-corrections survive a re-save. try/catch because a
+  // classification failure must NEVER fail the save.
+  if (saved?.vehicleId && saved.entry
+    && saved.type != LogTypeMileage && saved.type != LogTypeService
+    && !Array.isArray(data.scheduleKeys)) {
+    try {
+      const schedules: MaintenanceSchedule[] = await getSchedules({ vehicle: saved.vehicleId }) || [];
+      const confirmed = schedules.find((schedule) => schedule.status == "confirmed" && schedule.userId == saved.userId);
+      const keys = Array.from(new Set((confirmed?.items || []).map((item) => `${item.key || ""}`.trim()).filter(Boolean)));
+
+      if (keys.length) {
+        const scheduleKeys = await classifyLogScheduleKeys(saved.entry, keys);
+        saved = await store.logs.update({ ...saved, scheduleKeys, updatedBy: user.id });
+      }
+    } catch (err) {
+      console.error("services.logs.saveLog: classification failed (log saved without scheduleKeys)", { id: saved.id, err });
     }
   }
 

@@ -53,6 +53,30 @@ function loadMocks(): Record<string, any> {
   return mocks!;
 }
 
+// S14's write-time log classifier mock lives here in code (like embed()'s mockEmbed,
+// NOT in test/fixtures/ai-mocks.json — a classification is a function of its input, a
+// static canned answer would make every journal entry "match" the same keys):
+// deterministic keyword match over the caller's JSON user message ({ entry, keys } —
+// services/logs.ts's classifyLogScheduleKeys formats it that way precisely so this mock
+// can read it back). A key is returned when a distinctive word of it (a hyphen-part,
+// ≥ 3 chars) appears as a word in the entry text: "lubed the chain" → ["chain"],
+// "engine-oil" stays out. Good enough for seeded-store dev and specs to behave sensibly.
+function mockLogClassifier(messages: ChatMessage[]): { scheduleKeys: string[] } {
+  const lastUser = [...messages].reverse().find((message) => message.role == "user");
+  let payload: { entry?: string, keys?: string[] } = {};
+  try {
+    payload = JSON.parse(typeof lastUser?.content == "string" ? lastUser.content : "{}");
+  } catch {
+    // not the expected JSON payload → no matches
+  }
+
+  const words = new Set(`${payload.entry || ""}`.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  const scheduleKeys = (payload.keys || []).filter((key) =>
+    `${key}`.toLowerCase().split("-").some((part) => part.length >= 3 && words.has(part)));
+
+  return { scheduleKeys };
+}
+
 // A chat message as the Chat Completions API takes it. `content` is `any` on purpose:
 // text-only turns pass a string, extractFromImage passes the SDK's content-part arrays.
 export type ChatMessage = {
@@ -109,6 +133,11 @@ export async function chatJSON<T>({ messages, schemaName, schema, model, reasoni
   console.log("services.ai.chatJSON", { schemaName, messageCount: messages.length, model: model || MODELS.vision, reasoningEffort });
 
   if (mock()) {
+    // the log classifier's mock is computed from its input (see mockLogClassifier
+    // above), not looked up in the fixtures file
+    if (schemaName == "logClassifier") {
+      return mockLogClassifier(messages) as T;
+    }
     const mocks = loadMocks();
     if (!(schemaName in mocks)) {
       throw new Error(`services.ai.chatJSON(${schemaName}): no mock registered in test/fixtures/ai-mocks.json (AI_MOCK=true)`);
