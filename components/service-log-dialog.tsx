@@ -21,7 +21,7 @@ import { useAttachment } from "@/hooks/use-attachment"
 import { useAuth, useUserRecord } from "@/hooks/use-user"
 import { uploadFile } from "@/lib/upload"
 import { LogItem, LogTypeService } from "@/types/Log"
-import { Vehicle, vehicleName } from "@/types/Vehicle"
+import { matchVehicleDescription, Vehicle, vehicleName } from "@/types/Vehicle"
 
 // The S11 "Service / Receipt" record dialog: a structured service-log form
 // (vendor/date/mileage/line items/costs) that a receipt photo pre-fills via
@@ -94,6 +94,9 @@ export default function ServiceLogDialog({
   const [entry, setEntry] = useState("");
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [ocr, setOcr] = useState<OcrStatus>("idle");
+  // the receipt printed a vehicle description that matched NONE of the user's vehicles
+  // (or matched ambiguously) — surfaced as a warning so a wrong-bike save gets caught
+  const [vehicleMismatch, setVehicleMismatch] = useState("");
   // first Save tap on a lower-than-current mileage arms the inline "Save anyway"
   // confirm; the second tap actually submits
   const [saveWarningArmed, setSaveWarningArmed] = useState(false);
@@ -105,6 +108,9 @@ export default function ServiceLogDialog({
   const ocrSentIds = useRef<Set<string>>(new Set());
   // the OCR only REPLACES the items table while the user hasn't touched it
   const rowsEdited = useRef(false);
+  // a receipt-resolved vehicle auto-selects the picker ONLY while the user hasn't
+  // touched it — an explicit selection is never overridden
+  const vehicleEdited = useRef(false);
   const dateEdited = useRef(false);
   // scalar fields the USER typed into (vendor/mileage/totalCost) — a re-fired
   // extraction (more pages added) may overwrite its own earlier prefills, never these
@@ -125,9 +131,11 @@ export default function ServiceLogDialog({
       // linked to a saved log, and unlinked ones are tolerated orphans (deferred cleanup)
       setAttachments([]);
       setOcr("idle");
+      setVehicleMismatch("");
       setSaveWarningArmed(false);
       ocrSentIds.current = new Set();
       rowsEdited.current = false;
+      vehicleEdited.current = false;
       dateEdited.current = false;
       fieldEdited.current = new Set();
     }
@@ -174,6 +182,18 @@ export default function ServiceLogDialog({
       }
       if (result.mileage != null && !fieldEdited.current.has("mileage")) setMileage(String(result.mileage));
       if (result.totalCost != null && !fieldEdited.current.has("totalCost")) setTotalCost(String(result.totalCost));
+      // resolve the vehicle printed on the receipt against the user's garage:
+      // unambiguous match → auto-select (unless the user already picked); no/ambiguous
+      // match → warn, so the receipt doesn't get saved onto the wrong bike
+      if (result.vehicle) {
+        const matched = matchVehicleDescription(result.vehicle, sortedVehicles);
+        if (matched) {
+          setVehicleMismatch("");
+          if (!vehicleEdited.current) setVehicleId(matched.id);
+        } else {
+          setVehicleMismatch(result.vehicle);
+        }
+      }
       if (Array.isArray(result.items) && result.items.length && !rowsEdited.current) {
         setRows(result.items);
       }
@@ -392,7 +412,7 @@ export default function ServiceLogDialog({
                 id="service-vehicle"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                 value={vehicleId}
-                onChange={(e) => setVehicleId(e.target.value)}
+                onChange={(e) => { vehicleEdited.current = true; setVehicleId(e.target.value); }}
               >
                 {sortedVehicles.map((v: Vehicle) => (
                   <option key={v.id} value={v.id}>{vehicleName(v)}</option>
@@ -476,7 +496,12 @@ export default function ServiceLogDialog({
               Reading receipt…
             </span>
           }
-          {!saveWarningArmed && ocr == "done" &&
+          {!saveWarningArmed && ocr == "done" && vehicleMismatch &&
+            <span className="text-sm text-amber-600">
+              Receipt is for &ldquo;{vehicleMismatch}&rdquo; — no match in your vehicles, check the selection
+            </span>
+          }
+          {!saveWarningArmed && ocr == "done" && !vehicleMismatch &&
             <span className="text-sm text-muted-foreground">
               ✨ pre-filled from the receipt — check and save
             </span>

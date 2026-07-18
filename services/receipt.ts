@@ -22,6 +22,7 @@ type ExtractedReceipt = {
   receipt_clearly_visible: boolean,
   date: string | null,
   vendor: string | null,
+  vehicle: string | null,
   mileage: number | null,
   totalCost: number | null,
   items: ExtractedReceiptItem[],
@@ -32,6 +33,7 @@ export type ReceiptReading = {
   receipt_clearly_visible: boolean,
   date?: string,        // YYYYMMDD
   vendor?: string,
+  vehicle?: string,     // the vehicle description as printed (year/make/model/plate)
   mileage?: number,
   totalCost?: number,
   items: LogItem[],
@@ -61,6 +63,10 @@ const receiptSchema = {
     vendor: {
       type: ["string", "null"],
       description: "The shop/vendor name as printed on the receipt. null if not printed or illegible.",
+    },
+    vehicle: {
+      type: ["string", "null"],
+      description: "The vehicle description printed on the receipt (shops usually print year/make/model, sometimes plate or VIN, near the customer/vehicle details — e.g. \"2021 HONDA CB500X\"). Exactly as printed. null when no vehicle is identified on the receipt.",
     },
     mileage: {
       type: ["number", "null"],
@@ -103,7 +109,7 @@ const receiptSchema = {
       },
     },
   },
-  required: ["receipt_clearly_visible", "date", "vendor", "mileage", "totalCost", "items"],
+  required: ["receipt_clearly_visible", "date", "vendor", "vehicle", "mileage", "totalCost", "items"],
   additionalProperties: false,
 };
 
@@ -114,6 +120,7 @@ First decide: do the photos show a legible receipt or invoice whose printed text
 If the receipt is legible:
 - date: the service/invoice date, converted from whatever format is printed to YYYYMMDD.
 - vendor: the shop or vendor name as printed.
+- vehicle: the vehicle description printed near the customer/vehicle details (year, make, model, sometimes plate or VIN), exactly as printed. null when the receipt identifies no vehicle.
 - mileage: the vehicle's odometer reading ONLY if it is printed on the receipt (shops often print it near the vehicle details). Never infer one.
 - totalCost: the grand total as printed, taxes and fees included.
 - items: one entry per service or parts line. Do NOT emit line items for taxes, fees, or shop-supplies/consumables surcharge lines — those belong only in the grand total. Put brand/part detail in note (a "Front tire — Michelin Anakee Adventure" line gets name "Front tire" and note "Michelin Anakee Adventure"). For key, STRONGLY prefer one of: ${CANONICAL_COMPONENT_KEYS.join(", ")}; only mint a new kebab-case slug when none of those fit. action is what was done on that line (replace, inspect, adjust, lubricate, clean, or other). cost is that line's printed price, null when no per-line price is shown.`;
@@ -156,6 +163,7 @@ export function normalizeReceipt(extracted: ExtractedReceipt): ReceiptReading {
     receipt_clearly_visible: true,
     ...asTrimmedString(extracted.date) && { date: asTrimmedString(extracted.date) },
     ...asTrimmedString(extracted.vendor) && { vendor: asTrimmedString(extracted.vendor) },
+    ...asTrimmedString(extracted.vehicle) && { vehicle: asTrimmedString(extracted.vehicle) },
     ...asFiniteNumber(extracted.mileage) != undefined && { mileage: asFiniteNumber(extracted.mileage) },
     ...asFiniteNumber(extracted.totalCost) != undefined && { totalCost: asFiniteNumber(extracted.totalCost) },
     items,

@@ -46,6 +46,10 @@ test('a receipt photo pre-fills the service form; an edited line item saves into
   await expect(page.getByRole('spinbutton', { name: 'Total' })).toHaveValue('612.45');
   await expect(page.getByText('✨ pre-filled from the receipt — check and save')).toBeVisible();
 
+  // the receipt's printed vehicle ("2021 HONDA CB500X" per the mock) resolves against
+  // the garage, but the user's explicit selection is NEVER overridden by the scan
+  await expect(page.getByLabel('Vehicle')).toHaveValue(vehicle.id);
+
   // three canned line items; the user corrects the first one's name
   const nameCells = page.getByRole('dialog').getByRole('textbox', { name: 'Name' });
   await expect(nameCells).toHaveCount(3);
@@ -94,4 +98,26 @@ test('a receipt photo pre-fills the service form; an edited line item saves into
   // cleanup (deleting the log cascades to its attachment)
   await page.request.delete(`/api/logs/${log.id}`);
   await page.request.delete(`/api/vehicles/${vehicle.id}`);
+});
+
+test('an untouched vehicle picker auto-selects the vehicle printed on the receipt', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Service / Receipt' }).click();
+  await expect(page.getByRole('dialog', { name: 'Service / Receipt' })).toBeVisible();
+
+  // no manual vehicle selection: whatever the picker defaulted to (racy under the
+  // parallel run — it's the most recently logged vehicle), after the scan it must land
+  // on the receipt's printed "2021 HONDA CB500X". That resolves against the seeded
+  // CB500X — a read-only garage lookup this feature inherently depends on; no spec
+  // creates a CB500X-model vehicle, so the match stays unambiguous.
+  await expect(page.getByRole('button', { name: 'Add receipt photo / file' })).toBeEnabled();
+  await page.locator('input[type="file"]').setInputFiles(fixtureImage);
+
+  // "done" hint doubles as the no-mismatch-warning assertion (they're exclusive)
+  await expect(page.getByText('✨ pre-filled from the receipt — check and save')).toBeVisible();
+  await expect(page.getByLabel('Vehicle').locator('option:checked')).toContainText('CB500X');
+
+  // close without saving (footer button; the dialog's X also matches "Close"): the
+  // uploaded mock attachment is a tolerated orphan
+  await page.getByRole('button', { name: 'Close' }).first().click();
 });

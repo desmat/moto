@@ -59,6 +59,7 @@ test('POST /api/ai/receipt returns the canned, normalized mock extraction for an
     receipt_clearly_visible: true,
     date: '20260315',
     vendor: 'Moto Garage TestShop',
+    vehicle: '2021 HONDA CB500X',
     mileage: 17200,
     totalCost: 612.45,
     items: [
