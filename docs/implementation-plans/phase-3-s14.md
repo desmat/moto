@@ -5,6 +5,7 @@ Story: [phase-3.md](../phase-3.md) § S14. Depends on S10 (confirmed schedules) 
 ## Design
 
 - **Pure core, thin routes.** `computeMaintenanceStatus(...)` takes everything as arguments (including `now`) and touches no store — the routes assemble inputs; tests hit the routes (no unit runner exists) but the determinism lives in one function.
+- **Client-safe split (S0 flag 1)**: the pure pieces (`computeMaintenanceStatus`, S16's ranking helper, the threshold consts) live in **`lib/maintenance.ts`**, which imports nothing store-touching — S16's card and S17's table import from there. `services/maintenance.ts` holds only the store-touching assembly (`getVehicleMaintenance`); client components must never import it (a `services/*` import pulls `createStore({ debug: true })` module-scope construction into the client bundle).
 - **Matching is key equality.** A log "counts" for a schedule item when `log.items[].key` (S11 receipts, S13 seeds) or `log.scheduleKeys[]` (new — see classifier) contains the item's `key`. `lastDone` = the newest such log by `date` (YYYYMMDD compares lexically), its `mileage` if present.
 - **Due math**: `nextDue.km = lastDone.mileage + intervalKm`; `nextDue.date = lastDone.date + intervalMonths` (moment); when both, **earlier wins**. Never done: km-based → `firstAtKm` (else due-by-km unknowable); months-based with no history → `unknown`. Current position = `vehicle.mileage` (last *actual* reading — deliberately conservative; S15's projection converts future km to dates for display but never declares something overdue on projected kilometers).
 - **Status**: `overdue` (past km or date), `upcoming` (within `UPCOMING_KM_FRACTION = 0.1` of the interval or `UPCOMING_DAYS = 30`, whichever is sooner), `ok`, `unknown`. The two thresholds are exported consts, one place.
@@ -30,7 +31,8 @@ Story: [phase-3.md](../phase-3.md) § S14. Depends on S10 (confirmed schedules) 
   };
   ```
 - `types/Log.ts`: add `scheduleKeys?: string[]` (+ `fieldDisplayOrder`).
-- `services/maintenance.ts`: `computeMaintenanceStatus({ schedule, logs, vehicle, now })` (pure, exported) + `getVehicleMaintenance(vehicleId, userId)` (fetches confirmed schedule via `services/schedules.ts`, logs via `services/logs.ts`, assembles; S15 will thread projection in here).
+- `lib/maintenance.ts`: `computeMaintenanceStatus({ schedule, logs, vehicle, now })` (pure, exported) + `UPCOMING_KM_FRACTION`/`UPCOMING_DAYS` consts. **Client-safe: no `services/*` imports** (types + `lib/` + moment only).
+- `services/maintenance.ts`: `getVehicleMaintenance(vehicleId, userId)` (fetches confirmed schedule via `services/schedules.ts`, logs via `services/logs.ts`, assembles, calls the lib's compute; S15 will thread projection in here).
 - `services/logs.ts`: classifier call in `saveLog` per Design (after the existing post-save block; needs the vehicle's confirmed schedule — fetch via `services/schedules.ts`, reusing the already-fetched vehicle).
 - `services/ai.ts`: keyword-match mock for schema `logClassifier`.
 - `services/admin.ts`: backfill block.

@@ -8,7 +8,7 @@ Story: [phase-3.md](../phase-3.md) § S17. Depends on S14 + S15; shares the rank
 - **Breadcrumbs come almost free**: `app-breadcrumbs.tsx` prefix-matches `pageNames`, so the new route already renders "Dashboard | Vehicles | schedule". The only change: add `"schedule"` to the `altPageName` capitalization list (currently `["edit"]`) so it renders "Schedule". No `pageNames` entry needed — note this in the AGENTS.md nav paragraph if it reads otherwise.
 - **One data source**: `GET /api/vehicles/[id]/maintenance` (S14) has everything the table needs (items + status + lastDone + nextDue); `useSchedule({ vehicleId })` (S10) supplies title/source metadata for the header. New `useMaintenance({ vehicleId })` variant on S16's hook (same query key family, parameterized like `use-log`'s `{ id }` pattern).
 - **Rows are actionable, unknowns are recoverable**:
-  - Sorted by S16's shared ranking helper; `unknown` items grouped at the bottom under "No history yet".
+  - Sorted by S16's shared ranking helper — imported from **`lib/maintenance.ts`**, never `services/maintenance.ts` (S0 flag 1: client components must not pull store-touching service modules into the bundle); `unknown` items grouped at the bottom under "No history yet".
   - Per-row "Log it" → `service-log-dialog` with `defaultItems` + `defaultVehicleId` (exactly S16's interaction).
   - Per-unknown-row "When did you last do this?" → the same dialog with the date field emphasized — a *backdated* entry (S11's dialog already has an editable date; no new mechanism, just copy that frames it as history-capture, not new work).
 
@@ -31,12 +31,12 @@ Props: `items: MaintenanceItemStatus[]`, `vehicle`. Columns: status badge (color
 
 ## Tests
 
-- e2e: seeded store (S16's seeded confirmed schedule) → navigate to `/vehicles/vehicle-smoketest/schedule` → both seeded items render with correct badges (one overdue chain, one ok engine-oil per S16's seed math); last-done link opens the seeded oil-change log; "Log it" on the overdue row → dialog pre-filled → save → row flips out of overdue without reload. Unknown-item spec: add one seeded schedule item with no matching log (e.g. `valve-clearance`) → renders in the "No history yet" group → "When did you last do this?" → backdated save → row acquires lastDone.
+- e2e (**own fixtures via the API, not the seeds — S0 flag 3**: "Log it" against `vehicle-smoketest` would clear the seeded overdue chain other surfaces rely on, and seed-asserting specs race parallel writers): create vehicle → POST schedule with three items (one to make overdue via a backdated keyed log, one ok via a recent keyed log, one — e.g. `valve-clearance` — with no log at all) → confirm via `PUT` `status: "confirmed"` (the sanctioned path) → navigate to `/vehicles/⟨id⟩/schedule` → all three render with correct badges; last-done link opens the spec's own log; "Log it" on the overdue row → dialog pre-filled → save → row flips out of overdue without reload; the no-log item renders in "No history yet" → "When did you last do this?" → backdated save → row acquires lastDone. (The seeded CB500X schedule remains the hands-on dev/demo surface — verify it by eye, not by spec.)
 - `test/api`: none new (route consumes S14's tested endpoint).
 
 ## Steps
 
-1. `useMaintenance({ vehicleId })` → 2. `maintenance-table.tsx` → 3. page + header wiring → 4. breadcrumbs tweak + inbound links (card, schedule summary) → 5. seed the one no-history item → 6. e2e → 7. lint/build/test; manual at phone width per Design.
+1. `useMaintenance({ vehicleId })` → 2. `maintenance-table.tsx` → 3. page + header wiring → 4. breadcrumbs tweak + inbound links (card, schedule summary) → 5. e2e (own fixtures per Tests) → 6. lint/build/test; manual at phone width per Design (seeded CB500X schedule is the eyeball surface).
 
 ## Out of scope
 
