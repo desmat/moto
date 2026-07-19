@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { use, useState } from "react";
 import NotFound from "@/app/not-found";
 import JsonEditor from "@/components/json-editor";
+import NextDueCard from "@/components/next-due-card";
 import ScheduleReview from "@/components/schedule-review";
 import SetupVehicleDialog from "@/components/setup-vehicle-dialog";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,10 @@ export default function Page({
       }
       {vehicle &&
         <>
+          <div className="flex w-full max-w-[800px] flex-col items-center gap-3">
+            <div className="font-semibold">Next due</div>
+            <NextDueCard vehicleId={id} />
+          </div>
           <VehicleComponentsCard vehicle={vehicle} />
           <VehicleDocuments vehicleId={id} />
           <ScheduleReview vehicleId={id} />

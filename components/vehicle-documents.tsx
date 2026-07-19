@@ -138,7 +138,7 @@ export default function VehicleDocuments({ vehicleId }: { vehicleId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 items-center w-full max-w-[800px]">
+    <div id="documents" className="flex flex-col gap-3 items-center w-full max-w-[800px] scroll-mt-4">
       <div className="font-semibold">
         Documents
       </div>

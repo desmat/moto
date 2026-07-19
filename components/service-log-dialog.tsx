@@ -64,6 +64,7 @@ export default function ServiceLogDialog({
   vehicles,
   defaultVehicleId,
   defaultItems,
+  historyDatePrompt = false,
   onSubmit,
   children,
 }: {
@@ -75,6 +76,9 @@ export default function ServiceLogDialog({
   // S16: pre-populate the line-items table (the due item's key/name/action); the rows
   // stay fully editable and save through the normal path
   defaultItems?: Partial<LogItem>[],
+  // S17's no-history affordance uses the normal editable date field, but calls out
+  // that this is a backdated history entry rather than work performed today.
+  historyDatePrompt?: boolean,
   onSubmit?: (log: {
     vehicleId: string,
     type: string,
@@ -448,8 +452,8 @@ export default function ServiceLogDialog({
                 onChange={(e) => { fieldEdited.current.add("vendor"); setVendor(e.target.value); }}
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="service-date">Date</Label>
+            <div className={`flex flex-col gap-1 ${historyDatePrompt ? "rounded-md bg-amber-50 p-2 dark:bg-amber-950/30" : ""}`}>
+              <Label htmlFor="service-date">{historyDatePrompt ? "When was it last done?" : "Date"}</Label>
               <Input
                 id="service-date"
                 type="date"
@@ -457,6 +461,9 @@ export default function ServiceLogDialog({
                 onKeyDown={handleKeyDown}
                 onChange={(e) => { setDate(e.target.value); dateEdited.current = true; }}
               />
+              {historyDatePrompt &&
+                <span className="text-xs text-muted-foreground">Choose the best date you remember.</span>
+              }
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">

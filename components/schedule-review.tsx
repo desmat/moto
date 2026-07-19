@@ -73,12 +73,16 @@ function ScheduleEditor({ schedule, saveLabel, saving, onSave, onDiscard, discar
   )
 }
 
-export default function ScheduleReview({ vehicleId }: { vehicleId: string }) {
+export default function ScheduleReview({ vehicleId, startEditingConfirmed = false, onEditingConfirmedChange }: {
+  vehicleId: string,
+  startEditingConfirmed?: boolean,
+  onEditingConfirmedChange?: (editing: boolean) => void,
+}) {
   // `confirm` renamed on destructure so window.confirm stays reachable below
   const { loaded, schedules, save, confirm: confirmSchedule, delete: deleteSchedule } = useSchedule({ vehicleId });
   // to resolve "extracted from ⟨document title⟩" in the review banner
   const { documents } = useDocument({ vehicleId });
-  const [editingConfirmed, setEditingConfirmed] = useState(false);
+  const [editingConfirmed, setEditingConfirmed] = useState(startEditingConfirmed);
   const [saving, setSaving] = useState(false);
 
   if (!loaded || !schedules) return null;
@@ -108,6 +112,7 @@ export default function ScheduleReview({ vehicleId }: { vehicleId: string }) {
     try {
       await save({ ...schedule, items: rows });
       setEditingConfirmed(false);
+      onEditingConfirmedChange?.(false);
     } finally {
       setSaving(false);
     }
@@ -144,15 +149,21 @@ export default function ScheduleReview({ vehicleId }: { vehicleId: string }) {
       }
       {confirmed &&
         <div className="flex flex-col gap-2 w-full rounded-md border border-input p-3">
-          <div className="flex flex-row items-center gap-2 text-sm">
+          <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center">
             <span>
               Maintenance schedule: {confirmed.items?.length || 0} items
               {documentTitle(confirmed) ? ` from ${documentTitle(confirmed)}` : ""}
             </span>
             {!editingConfirmed &&
-              <div className="ml-auto flex flex-row gap-2">
+              <div className="flex flex-row flex-wrap gap-2 sm:ml-auto">
+                <Button variant="outline" size="sm" href={`/vehicles/${vehicleId}/schedule`}>
+                  View schedule
+                </Button>
                 <CopyScheduleJsonButton items={confirmed.items || []} />
-                <Button variant="outline" size="sm" onClick={() => setEditingConfirmed(true)}>
+                <Button variant="outline" size="sm" onClick={() => {
+                  setEditingConfirmed(true);
+                  onEditingConfirmedChange?.(true);
+                }}>
                   Edit
                 </Button>
               </div>
@@ -166,7 +177,10 @@ export default function ScheduleReview({ vehicleId }: { vehicleId: string }) {
               discardLabel="Cancel"
               saving={saving}
               onSave={(rows) => handleSaveConfirmed(confirmed, rows)}
-              onDiscard={() => setEditingConfirmed(false)}
+              onDiscard={() => {
+                setEditingConfirmed(false);
+                onEditingConfirmedChange?.(false);
+              }}
             />
           }
         </div>

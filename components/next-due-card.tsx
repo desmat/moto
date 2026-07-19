@@ -13,9 +13,9 @@ import { STALE_DAYS } from "@/lib/mileage";
 import { VehicleMaintenance } from "@/types/Maintenance";
 import { Vehicle, vehicleName } from "@/types/Vehicle";
 
-// S16: the "next due" dashboard card — replaces the placeholder 🤖 line with the top 3
-// overdue/upcoming items across the whole garage (lib/maintenance.ts's ranking, shared
-// with S17). Every row is actionable: it opens the S11 service-log dialog pre-filled
+// S16/S17: the "next due" card shows the top 3 overdue/upcoming items across the
+// garage, or for one vehicle when vehicleId is supplied. Every row is actionable: it
+// opens the S11 service-log dialog pre-filled
 // with the item and vehicle, and saving invalidates ["maintenance"] (use-log.tsx) so
 // the row clears without a reload.
 //
@@ -51,9 +51,9 @@ function duePhrase(entry: RankedMaintenanceItem): string {
   return "due soon";
 }
 
-export default function NextDueCard() {
-  const { loaded: maintenanceLoaded, vehicles: maintenance } = useMaintenance();
-  const { loaded: vehiclesLoaded, vehicles } = useVehicle();
+export default function NextDueCard({ vehicleId }: { vehicleId?: string } = {}) {
+  const { loaded: maintenanceLoaded, vehicles: maintenance } = useMaintenance({ vehicleId });
+  const { loaded: vehiclesLoaded, vehicles } = useVehicle(vehicleId);
   const { add: addLog } = useLog();
 
   const loaded = maintenanceLoaded && vehiclesLoaded;
@@ -122,14 +122,11 @@ export default function NextDueCard() {
         </ServiceLogDialog>
       ))}
       {loaded && top.length > 0 &&
-        /* S17's full-schedule route; when items span vehicles this follows the top
-           (most urgent) item's vehicle */
-        <Button
-          variant="link"
-          href={`/vehicles/${top[0].vehicleId}/schedule`}
-          className="self-center h-auto p-0"
-        >
-          (More)
+        /* dashboard → all schedules; vehicle detail → that vehicle's schedule */
+        <Button variant="link" asChild className="self-center h-auto p-0">
+          <Link href={vehicleId ? `/vehicles/${vehicleId}/schedule` : "/vehicles/schedule"}>
+            (More)
+          </Link>
         </Button>
       }
 

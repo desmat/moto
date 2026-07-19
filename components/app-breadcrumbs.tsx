@@ -23,7 +23,7 @@ export function AppBreadcrumbs({ ...props }: React.ComponentProps<typeof Breadcr
   const lastPath = path.split("/").reverse()[0];
   const pageNamesEntry = Object.entries(pageNames).find(([k, v]) => path.startsWith(k)) || ["/", undefined];
   const pageName = pageNamesEntry && pageNamesEntry[1] || lastPath;
-  const altPageName = ["edit"].includes(lastPath)
+  const altPageName = ["edit", "schedule"].includes(lastPath)
     ? upperCaseFirstLetter(lastPath)
     : lastPath;
   console.log("components.app-breadcrumps", { path, lastPath, pageNamesEntry, pageName, altPageName });

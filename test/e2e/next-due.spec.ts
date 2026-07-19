@@ -68,8 +68,17 @@ test('overdue item: card row → pre-filled service dialog → save clears it wi
   await expect(row).toContainText('overdue by');
   await expect(row).toContainText(modelName);
 
+  // Dashboard More is the garage-wide schedule, not whichever vehicle happens to own
+  // the most urgent item. Our isolated fixture appears in its own vehicle section.
+  await page.getByRole('link', { name: '(More)' }).click();
+  await expect(page).toHaveURL('/vehicles/schedule');
+  const aggregateSection = page.locator(`[data-maintenance-vehicle="${vehicle.id}"]`);
+  await expect(aggregateSection.getByRole('heading', { name: new RegExp(modelName) })).toBeVisible();
+  await expect(aggregateSection.locator(`[data-maintenance-key="chain"]`)).toContainText(itemName);
+  await page.goto('/');
+
   // clicking the row opens the service dialog pre-filled with vehicle + item
-  await row.click();
+  await page.getByRole('button', { name: new RegExp(itemName) }).click();
   const dialog = page.getByRole('dialog', { name: 'Service / Receipt' });
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('#service-vehicle')).toHaveValue(vehicle.id);

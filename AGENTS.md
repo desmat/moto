@@ -44,7 +44,7 @@ MotoGPT is a Next.js 14 App Router app for tracking motorcycle maintenance (vehi
 
 **Entity detail pages**: `/vehicles/[id]`, `/logs/[id]`, and `/user` all render `components/json-editor.tsx` — a textarea with the record's pretty-printed JSON that the user edits and PUTs back directly. The PUT routes pin identity fields (`id`, `userId`/`providerId`, `createdAt`, `createdBy`) to the existing record so those can't actually be changed from the editor. When replacing this (or the plain-`useState` record dialogs) with real field-level forms, read `docs/form-patterns.md` first — it documents the generic record-editing pattern from the Vice project this repo was forked from, and where to recover that code.
 
-**Nav**: sidebar items live in `app-sidebar.tsx`'s `NavItems` (Vehicles, Logs, Insights, User); `app-bottom-bar.tsx` imports and reuses `NavItems`; `app-breadcrumbs.tsx` has a separate `pageNames` map — keep both in sync by hand when routes change.
+**Nav**: sidebar items live in `app-sidebar.tsx`'s `NavItems` (Vehicles, Logs, Insights, User); `app-bottom-bar.tsx` imports and reuses `NavItems`; `app-breadcrumbs.tsx` has a separate `pageNames` map — keep both in sync by hand when top-level routes change. Nested routes prefix-match that map; human-readable final segments such as `edit` and `schedule` belong in `altPageName`, not `pageNames`.
 
 **Path alias**: `@/*` maps to the repo root (see `tsconfig.json`).
 
