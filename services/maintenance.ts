@@ -3,6 +3,7 @@ import { getLogs } from "./logs";
 import { getSchedules } from "./schedules";
 import { getVehicle } from "./vehicles";
 import { computeMaintenanceStatus } from "@/lib/maintenance";
+import { extractReadings, fitProjection } from "@/lib/mileage";
 import { VehicleMaintenance } from "@/types/Maintenance";
 import { MaintenanceSchedule } from "@/types/MaintenanceSchedule";
 
@@ -31,10 +32,15 @@ export async function getVehicleMaintenance(vehicleId: string, userId: string): 
   const schedule = ((schedules || []) as MaintenanceSchedule[])
     .find((candidate) => candidate.status == "confirmed" && candidate.userId == userId);
 
+  const now = moment().format("YYYYMMDD");
+
   return computeMaintenanceStatus({
     schedule,
     logs: logs || [],
     vehicle,
-    now: moment().format("YYYYMMDD"),
+    now,
+    // S15: the projection is built from the SAME logs the engine reads — never stored,
+    // always computed (lib/mileage.ts); undefined when there are no odometer readings
+    projection: fitProjection(extractReadings(logs || []), now),
   });
 }

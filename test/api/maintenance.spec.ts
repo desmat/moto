@@ -417,3 +417,184 @@ test('maintenance route 404s for a missing vehicle', async ({ request }) => {
   const res = await request.get('/api/vehicles/does-not-exist/maintenance');
   expect(res.status()).toBe(404);
 });
+
+// ---------------------------------------------------------------------------
+// S15 mileage projection (lib/mileage.ts), exercised through the same route.
+// Fixtures post mileage-type logs in ascending date order — saveLog's post-save sync
+// overwrites vehicle.mileage on every mileage log, so the vehicle ends up matching the
+// newest reading (used deliberately). Estimated dates are asserted with a ±1 day
+// tolerance: the server computes "now" at request time, so a midnight rollover
+// mid-test must not flip the assertion.
+
+const mileageLog = (vehicleId: string, date: string, mileage: number) =>
+  ({ vehicleId, type: 'mileage', date, entry: `${mileage}` });
+
+const expectDateNear = (actual: string, expected: string) => {
+  expect(actual).toBeTruthy();
+  expect(Math.abs(moment(actual, DATE).diff(moment(expected, DATE), 'days'))).toBeLessThanOrEqual(1);
+};
+
+test('projection: steady rider gets an estimated date where the arithmetic says', async ({ request }) => {
+  // 1000 km every 10 days → 100 km/day; span 20 days, newest 10 days old → high
+  const vehicle = await createVehicle(request, 0);
+  await confirmSchedule(request, vehicle.id, [
+    { key: 'valve-clearance', name: 'Valve clearance', action: 'inspect', intervalKm: 5000, firstAtKm: 5000 },
+  ]);
+  await postLog(request, mileageLog(vehicle.id, daysAgo(30), 1000));
+  await postLog(request, mileageLog(vehicle.id, daysAgo(20), 2000));
+  await postLog(request, mileageLog(vehicle.id, daysAgo(10), 3000));
+
+  const maintenance = await getMaintenance(request, vehicle.id);
+  expect(maintenance.projection).toBeTruthy();
+  expect(maintenance.projection.confidence).toBe('high');
+  expect(maintenance.projection.kmPerDay).toBeCloseTo(100, 5);
+
+  // never done + firstAtKm 5000, last reading 3000 at daysAgo(10) → 2000 km / 100 km/day
+  // = 20 days after the reading = ~10 days from now
+  const valves = itemFor(maintenance, 'valve-clearance');
+  expect(valves.nextDue.km).toBe(5000);
+  expect(valves.nextDue.estimated).toBe(true);
+  expectDateNear(valves.nextDue.date, moment().add(10, 'days').format(DATE));
+  // the estimated date pulls the item into the 30-day upcoming window even though the
+  // km axis alone wouldn't (2000 km remaining vs a 500 km window) — the story's point
+  expect(valves.status).toBe('upcoming');
+  expect(valves.overdueByDays).toBeUndefined();
+
+  await cleanup(request, vehicle);
+});
+
+test('projection: single reading → confidence none, km due but no date', async ({ request }) => {
+  const vehicle = await createVehicle(request, 0);
+  await confirmSchedule(request, vehicle.id, [
+    { key: 'valve-clearance', name: 'Valve clearance', action: 'inspect', intervalKm: 5000, firstAtKm: 5000 },
+  ]);
+  await postLog(request, mileageLog(vehicle.id, daysAgo(5), 1200));
+
+  const maintenance = await getMaintenance(request, vehicle.id);
+  expect(maintenance.projection).toEqual({ kmPerDay: 0, confidence: 'none' });
+  expect(maintenance.lastReading).toEqual({ mileage: 1200, date: daysAgo(5) });
+
+  const valves = itemFor(maintenance, 'valve-clearance');
+  expect(valves.nextDue.km).toBe(5000);
+  expect(valves.nextDue.date).toBeUndefined();
+  expect(valves.nextDue.estimated).toBeUndefined();
+
+  await cleanup(request, vehicle);
+});
+
+test('projection: two readings 3 days apart → low confidence, date still present', async ({ request }) => {
+  const vehicle = await createVehicle(request, 0);
+  await confirmSchedule(request, vehicle.id, [
+    { key: 'valve-clearance', name: 'Valve clearance', action: 'inspect', intervalKm: 1500, firstAtKm: 1500 },
+  ]);
+  await postLog(request, mileageLog(vehicle.id, daysAgo(4), 1000));
+  await postLog(request, mileageLog(vehicle.id, daysAgo(1), 1300)); // 100 km/day, span 3 < 14
+
+  const maintenance = await getMaintenance(request, vehicle.id);
+  expect(maintenance.projection.confidence).toBe('low');
+  expect(maintenance.projection.kmPerDay).toBeCloseTo(100, 5);
+
+  // (1500 - 1300) / 100 = 2 days after daysAgo(1) = ~1 day out; consumers soften the
+  // phrasing at "low" — asserted here only as the confidence value on the payload
+  const valves = itemFor(maintenance, 'valve-clearance');
+  expect(valves.nextDue.estimated).toBe(true);
+  expectDateNear(valves.nextDue.date, moment().add(1, 'days').format(DATE));
+
+  await cleanup(request, vehicle);
+});
+
+test('projection: newest reading 90 days old → low confidence', async ({ request }) => {
+  const vehicle = await createVehicle(request, 0);
+  await confirmSchedule(request, vehicle.id, [
+    { key: 'valve-clearance', name: 'Valve clearance', action: 'inspect', intervalKm: 6000, firstAtKm: 6000 },
+  ]);
+  await postLog(request, mileageLog(vehicle.id, daysAgo(110), 1000));
+  await postLog(request, mileageLog(vehicle.id, daysAgo(90), 3000)); // span 20, but stale
+
+  const maintenance = await getMaintenance(request, vehicle.id);
+  expect(maintenance.projection.confidence).toBe('low');
+  expect(maintenance.projection.kmPerDay).toBeCloseTo(100, 5);
+
+  await cleanup(request, vehicle);
+});
+
+test('projection: target below the last reading clamps the date to today, never the past', async ({ request }) => {
+  // steady 100 km/day, newest reading 3000 — but the item was due at 2500, so the
+  // arithmetic date is behind us; the estimate clamps to "now"
+  const vehicle = await createVehicle(request, 0);
+  await confirmSchedule(request, vehicle.id, [
+    { key: 'valve-clearance', name: 'Valve clearance', action: 'inspect', intervalKm: 2500, firstAtKm: 2500 },
+  ]);
+  await postLog(request, mileageLog(vehicle.id, daysAgo(30), 1000));
+  await postLog(request, mileageLog(vehicle.id, daysAgo(10), 3000));
+
+  const maintenance = await getMaintenance(request, vehicle.id);
+  expect(maintenance.projection.confidence).toBe('high');
+
+  const valves = itemFor(maintenance, 'valve-clearance');
+  expect(valves.nextDue.estimated).toBe(true);
+  expectDateNear(valves.nextDue.date, today());
+  expect(valves.nextDue.date >= daysAgo(1)).toBeTruthy(); // never in the past
+  // overdue comes from ACTUAL vehicle.mileage (3000 vs due 2500), never the projection;
+  // the clamped estimated date (today) contributes no overdueByDays
+  expect(valves.status).toBe('overdue');
+  expect(valves.overdueByKm).toBe(500);
+  expect(valves.overdueByDays).toBeUndefined();
+
+  await cleanup(request, vehicle);
+});
+
+test('projection: decreasing readings → slope <= 0, low confidence, no estimated date', async ({ request }) => {
+  const vehicle = await createVehicle(request, 0);
+  await confirmSchedule(request, vehicle.id, [
+    { key: 'valve-clearance', name: 'Valve clearance', action: 'inspect', intervalKm: 5000, firstAtKm: 5000 },
+  ]);
+  await postLog(request, mileageLog(vehicle.id, daysAgo(30), 3000));
+  await postLog(request, mileageLog(vehicle.id, daysAgo(10), 2000)); // downward correction
+
+  const maintenance = await getMaintenance(request, vehicle.id);
+  expect(maintenance.projection.confidence).toBe('low');
+  expect(maintenance.projection.kmPerDay).toBeLessThanOrEqual(0);
+
+  // slope guard: estimateDateForMileage returns undefined — km due stays date-less
+  const valves = itemFor(maintenance, 'valve-clearance');
+  expect(valves.nextDue.km).toBe(5000);
+  expect(valves.nextDue.date).toBeUndefined();
+  expect(valves.nextDue.estimated).toBeUndefined();
+
+  await cleanup(request, vehicle);
+});
+
+test('projection: backdated lower service reading after a higher mileage log', async ({ request }) => {
+  // a service log dated AFTER the mileage log but with a LOWER odometer (correction):
+  // readings sort by date, fit tolerates the non-monotonic pair, floor = newest-by-date
+  const vehicle = await createVehicle(request, 0);
+  await confirmSchedule(request, vehicle.id, [
+    { key: 'engine-oil', name: 'Engine oil', action: 'replace', intervalKm: 8000, firstAtKm: 2400 },
+    { key: 'valve-clearance', name: 'Valve clearance', action: 'inspect', intervalKm: 5000, firstAtKm: 5000 },
+  ]);
+  await postLog(request, mileageLog(vehicle.id, daysAgo(5), 3000));
+  await postLog(request, {
+    vehicleId: vehicle.id,
+    type: 'service',
+    date: daysAgo(2),
+    entry: 'Odometer per invoice',
+    mileage: 2500,
+  });
+
+  const maintenance = await getMaintenance(request, vehicle.id);
+  // newest-by-date observation wins, even though it's the lower value
+  expect(maintenance.lastReading).toEqual({ mileage: 2500, date: daysAgo(2) });
+  expect(maintenance.projection.confidence).toBe('low'); // slope <= 0
+
+  // target below the newest-by-date floor (2400 <= 2500) → already passed → today,
+  // even with a non-positive slope (no extrapolation needed)
+  const oil = itemFor(maintenance, 'engine-oil');
+  expect(oil.nextDue.estimated).toBe(true);
+  expectDateNear(oil.nextDue.date, today());
+  // target above the floor + slope <= 0 → no date at all
+  const valves = itemFor(maintenance, 'valve-clearance');
+  expect(valves.nextDue.date).toBeUndefined();
+
+  await cleanup(request, vehicle);
+});

@@ -1,5 +1,6 @@
 import moment from "moment";
 import { Log, LogTypeMileage } from "@/types/Log";
+import { Projection, estimateDateForMileage } from "@/lib/mileage";
 import { MaintenanceItemStatus, VehicleMaintenance } from "@/types/Maintenance";
 import { MaintenanceSchedule, ScheduleItem } from "@/types/MaintenanceSchedule";
 import { Vehicle } from "@/types/Vehicle";
@@ -52,7 +53,7 @@ function lastReading(logs: Log[]): { mileage: number, date: string } | undefined
   return best;
 }
 
-function computeItemStatus(item: ScheduleItem, logs: Log[], currentKm: number | undefined, now: string): MaintenanceItemStatus {
+function computeItemStatus(item: ScheduleItem, logs: Log[], currentKm: number | undefined, now: string, projection?: Projection): MaintenanceItemStatus {
   // lastDone = the newest matching log by date (YYYYMMDD lexical; createdAt breaks
   // same-day ties in favor of the later write)
   const done = logs
@@ -81,6 +82,24 @@ function computeItemStatus(item: ScheduleItem, logs: Log[], currentKm: number | 
     }
   } else if (item.firstAtKm != undefined) {
     nextDue.km = item.firstAtKm;
+  }
+
+  // S15: turn a km-due into an approximate date via the mileage projection, marked
+  // `estimated: true`. EARLIER WINS, mirroring the two-axis status rule below: the item
+  // actually comes due at whichever axis trips first, so a months-derived date is only
+  // replaced when the km-derived estimate is EARLIER (a later estimate would hide the
+  // real, sooner date-due; a later months date is superseded because the km axis will
+  // trip before it). Skipped entirely at confidence "none"; estimateDateForMileage
+  // itself refuses slope <= 0, and clamps already-passed targets to "now" — so an
+  // estimated date is never in the past and can therefore never create overdueByDays:
+  // it feeds ONLY the upcoming window (time-awareness, the story's point). Overdue
+  // stays anchored to actual km/real dates (S14's conservative rule).
+  if (projection && projection.confidence != "none" && nextDue.km != undefined) {
+    const estimated = estimateDateForMileage(projection, nextDue.km);
+    if (estimated != undefined && (nextDue.date == undefined || estimated < nextDue.date)) {
+      nextDue.date = estimated;
+      nextDue.estimated = true;
+    }
   }
 
   // per-axis remaining; an axis only participates when both its due value and the
@@ -122,18 +141,24 @@ function computeItemStatus(item: ScheduleItem, logs: Log[], currentKm: number | 
 // the vehicle's CONFIRMED schedule (or undefined — the caller filters; a dangling
 // proposal is inert by design). No schedule → scheduleId absent + empty items: the
 // distinct "no schedule" shape, not an error, so UIs can funnel to manual upload.
-export function computeMaintenanceStatus({ schedule, logs, vehicle, now }: {
+export function computeMaintenanceStatus({ schedule, logs, vehicle, now, projection }: {
   schedule?: MaintenanceSchedule,
   logs: Log[],
   vehicle: Vehicle,
   now: string, // YYYYMMDD
+  projection?: Projection, // S15: turns km-dues into estimated dates; optional on purpose
 }): VehicleMaintenance {
   const reading = lastReading(logs || []);
+  // surfaced (kmPerDay + confidence only) so S16's stale-mileage funnel can branch on
+  // confidence alongside lastReading
+  const projectionSummary = projection
+    && { kmPerDay: projection.kmPerDay, confidence: projection.confidence };
 
   if (!schedule) {
     return {
       vehicleId: vehicle.id,
       ...reading && { lastReading: reading },
+      ...projectionSummary && { projection: projectionSummary },
       items: [],
     };
   }
@@ -147,6 +172,7 @@ export function computeMaintenanceStatus({ schedule, logs, vehicle, now }: {
     vehicleId: vehicle.id,
     scheduleId: schedule.id,
     ...reading && { lastReading: reading },
-    items: (schedule.items || []).map((item) => computeItemStatus(item, logs || [], currentKm, now)),
+    ...projectionSummary && { projection: projectionSummary },
+    items: (schedule.items || []).map((item) => computeItemStatus(item, logs || [], currentKm, now, projection)),
   };
 }

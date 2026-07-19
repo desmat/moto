@@ -23,5 +23,8 @@ export type VehicleMaintenance = {
   vehicleId: string;
   scheduleId?: string;               // absent → "no schedule" (distinct, not an error)
   lastReading?: { mileage: number, date: string };
+  // S15 mileage projection summary (lib/mileage.ts) — S16's stale-mileage funnel reads
+  // lastReading + this; absent when the vehicle has no odometer observations at all
+  projection?: { kmPerDay: number, confidence: "high" | "low" | "none" };
   items: MaintenanceItemStatus[];
 };
