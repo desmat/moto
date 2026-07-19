@@ -85,7 +85,7 @@ export default function NextDueCard() {
   const allCaughtUp = loaded && due.length == 0 && noSchedule.length == 0 && staleMileage.length == 0;
 
   return (
-    <div className="flex flex-col gap-1 mb-2 -mt-2 w-full max-w-2xl">
+    <div className="flex flex-col items-center gap-1 mb-2 -mt-2 w-full max-w-2xl">
       {!loaded &&
         /* loading: the old placeholder sentence doubles as skeleton text so the
            dashboard doesn't rearrange while the statuses load */
@@ -109,7 +109,7 @@ export default function NextDueCard() {
         >
           <button
             type="button"
-            className="flex flex-row items-baseline gap-2 text-left group w-full"
+            className="flex flex-row items-baseline gap-2 text-left group"
           >
             <span aria-hidden="true">⚠️</span>
             <span className="min-w-0">
@@ -127,7 +127,7 @@ export default function NextDueCard() {
         <Button
           variant="link"
           href={`/vehicles/${top[0].vehicleId}/schedule`}
-          className="self-start h-auto p-0 ml-6"
+          className="self-center h-auto p-0"
         >
           (More)
         </Button>
