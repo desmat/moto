@@ -22,7 +22,7 @@ export default function Page() {
     <div className="flex w-full flex-col items-center gap-6">
       {loaded &&
         <>
-          <div className="w-full max-w-6xl"><AppBreadcrumbs /></div>
+          {/* <div className="w-full max-w-6xl"><AppBreadcrumbs /></div> */}
           <div className="w-full max-w-6xl">
             <h1 className="text-2xl font-semibold">Maintenance schedules</h1>
             <p className="text-sm text-muted-foreground">All vehicles</p>

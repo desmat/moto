@@ -38,7 +38,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     <div className="flex w-full flex-col items-center gap-5">
       {loaded && vehicle && status &&
         <>
-          <div className="w-full max-w-6xl"><AppBreadcrumbs /></div>
+          {/* <div className="w-full max-w-6xl"><AppBreadcrumbs /></div> */}
           <div className="flex w-full max-w-6xl flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1 className="text-2xl font-semibold">Maintenance schedule</h1>

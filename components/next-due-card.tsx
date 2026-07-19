@@ -123,7 +123,7 @@ export default function NextDueCard({ vehicleId }: { vehicleId?: string } = {}) 
       ))}
       {loaded && top.length > 0 &&
         /* dashboard → all schedules; vehicle detail → that vehicle's schedule */
-        <Button variant="link" asChild className="self-center h-auto p-0">
+        <Button variant="link" asChild className="self-center opacity-40 h-auto p-0">
           <Link href={vehicleId ? `/vehicles/${vehicleId}/schedule` : "/vehicles/schedule"}>
             (More)
           </Link>

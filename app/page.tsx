@@ -253,6 +253,7 @@ export default function Page() {
           {latestLogs && latestLogs.length > 10 &&
             <Button
               variant="link"
+              className="opacity-40"
               href="/logs"
             >
               (More)

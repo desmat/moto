@@ -58,7 +58,7 @@ export default function Page({
       {vehicle &&
         <>
           <div className="flex w-full max-w-[800px] flex-col items-center gap-3">
-            <div className="font-semibold">Next due</div>
+            {/* <div className="font-semibold">Next due</div> */}
             <NextDueCard vehicleId={id} />
           </div>
           <VehicleComponentsCard vehicle={vehicle} />
