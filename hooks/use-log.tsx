@@ -95,6 +95,9 @@ export function useLog({ id, count, offset }: { id?: string, count?: number, off
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
       // and linked attachments gain a logId server-side
       queryClient.invalidateQueries({ queryKey: ["attachments"] });
+      // and maintenance statuses derive from logs — this is what makes S16's
+      // "log it → item clears" work without a reload
+      queryClient.invalidateQueries({ queryKey: ["maintenance"] });
     },
   });
 
@@ -119,6 +122,7 @@ export function useLog({ id, count, offset }: { id?: string, count?: number, off
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey });
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance"] });
     },
   });
 
@@ -150,6 +154,7 @@ export function useLog({ id, count, offset }: { id?: string, count?: number, off
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: ["maintenance"] });
     },
   });
 

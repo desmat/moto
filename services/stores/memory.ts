@@ -162,16 +162,41 @@ function buildLogSeeds(): any[] {
   // since S11, with structured `items` keyed to CANONICAL_COMPONENT_KEYS -- gives S12
   // and Phase 3 seeded structure to work against out of the box (ids/dates/entries
   // unchanged; smoke-log-7 keeps its seeded attachment link)
+  //
+  // S16 seed arithmetic — the CB500X demos deterministically as "chain OVERDUE,
+  // engine-oil OK" against its real confirmed schedule (schedule-seed-0: chain
+  // lubricate intervalKm 1000, no months axis; engine-oil replace intervalKm 12000 +
+  // intervalMonths 12; oil-filter replace intervalKm 12000). Seeds bypass saveLog, so
+  // the write-time classifier never keys them — the keys/dates/mileages are stamped
+  // directly:
+  // - smoke-log-6 ("chain adjustment", 40 days ago) carries scheduleKeys: ["chain"] +
+  //   mileage 17100 → chain lastDone 17100 → nextDue.km 18100 vs vehicle.mileage 18250
+  //   → OVERDUE by 150 km (the chain item has no months interval, so overdue has to
+  //   come from the km axis — hence the stamped mileage; the re-date from 5 to 40 days
+  //   keeps the ride history plausible for a 1,150 km gap).
+  // - smoke-log-1 (day-0 "chain cleaned" journal) stays UNKEYED on purpose: realistic
+  //   pre-classifier free text, inert to the engine — keying it would clear the
+  //   overdue.
+  // - smoke-log-3 (oil service, 3 days ago) carries mileage 18210 (previously absent —
+  //   km-based oil math was silent) → engine-oil/oil-filter nextDue.km 30210, 11,960 km
+  //   remaining (window 1,200) and date-due 12 months out → both OK.
+  // - odometer observations (17100@-40d, 17980@-12d, 18210@-3d, 18250@-1d) fit a
+  //   positive slope over a 39-day span with a 1-day-fresh newest reading → projection
+  //   confidence "high", so the CB500X trips neither S16 funnel line.
   return [
     mk(0, "journal", "Chain cleaned and lubed after the weekend ride.", "1"),
     mk(1, "mileage", "18250", "2"),
     mk(3, "service", "Full synthetic 10W-30, new filter.", "3", {
+      mileage: 18210,
       items: [
         { key: "engine-oil", name: "Engine oil", action: "replace", note: "Full synthetic 10W-30" },
         { key: "oil-filter", name: "Oil filter", action: "replace" },
       ],
     }),
-    mk(5, "chain adjustment", "Tightened to 35mm slack, cleaned and lubed.", "6"),
+    mk(40, "chain adjustment", "Tightened to 35mm slack, cleaned and lubed.", "6", {
+      mileage: 17100,
+      scheduleKeys: ["chain"],
+    }),
     mk(8, "journal", "Front brake lever feels spongy, bleed brakes soon.", "4"),
     mk(10, "service", "Michelin Anakee Adventure front and rear.", "7", {
       items: [

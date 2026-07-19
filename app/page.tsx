@@ -6,6 +6,7 @@ import { Gauge, NotebookPen, Paperclip, Wrench, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import LogEntryDialog, { LogEntryMode } from "@/components/log-entry-dialog";
+import NextDueCard from "@/components/next-due-card";
 import OnboardingInterview from "@/components/onboarding-interview";
 import ServiceLogDialog from "@/components/service-log-dialog";
 // charts deliberately disabled for now (they render dummy data) -- revive these imports
@@ -103,11 +104,7 @@ export default function Page() {
 
   return (
     <div className="_bg-yellow-200 flex flex-col gap-4 items-center w-full">
-      {/* TODO dummy placeholder -- AI-generated maintenance insights will go here */}
-      <div className="_flex flex-row gap-3 mb-2 -mt-2 pl-[1rem]">
-        <span className="ml-[-1rem] text-[1.2rem]">🤖 </span>
-        <span className="italic">Looking good! Keep logging your rides and maintenance and I&apos;ll keep an eye on what&apos;s due next.</span>
-      </div>
+      <NextDueCard />
 
       {(setupVehicles as any[]).map((vehicle: any) => (
         <div

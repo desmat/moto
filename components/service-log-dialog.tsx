@@ -62,10 +62,19 @@ const itemColumns: ExtractedRowsColumn[] = [
 
 export default function ServiceLogDialog({
   vehicles,
+  defaultVehicleId,
+  defaultItems,
   onSubmit,
   children,
 }: {
   vehicles?: Vehicle[],
+  // S16: pre-select the picker (the dashboard card knows which bike the due item
+  // belongs to). Pre-selecting is the only change — everything else about the picker
+  // (Save gated on a chosen vehicle, receipt-scan resolution, mismatch warning) stands.
+  defaultVehicleId?: string,
+  // S16: pre-populate the line-items table (the due item's key/name/action); the rows
+  // stay fully editable and save through the normal path
+  defaultItems?: Partial<LogItem>[],
   onSubmit?: (log: {
     vehicleId: string,
     type: string,
@@ -120,13 +129,19 @@ export default function ServiceLogDialog({
     if (open) {
       // deliberately UNSELECTED with multiple vehicles (no "most recent" guess): the
       // receipt scan auto-selects on a match, and Save stays disabled until a vehicle
-      // is chosen — a receipt can't silently land on the wrong bike
-      setVehicleId(sortedVehicles.length == 1 ? sortedVehicles[0].id : "");
+      // is chosen — a receipt can't silently land on the wrong bike. An explicit
+      // defaultVehicleId (S16's card, where the user tapped a specific bike's item)
+      // pre-selects; Save gating and scan behavior are unchanged.
+      setVehicleId(
+        (defaultVehicleId && sortedVehicles.some((v) => v.id == defaultVehicleId) && defaultVehicleId)
+        || (sortedVehicles.length == 1 ? sortedVehicles[0].id : ""));
       setVendor("");
       setDate(moment().format("YYYY-MM-DD")); // default today
       setMileage("");
       setTotalCost("");
-      setRows([]);
+      // S16: rows pre-populated from the tapped due item (copies — ExtractedRows edits
+      // rows in place via onChange, never the caller's array)
+      setRows(defaultItems?.length ? defaultItems.map((item) => ({ ...item })) : []);
       setEntry("");
       // uploads from a previous open are NOT deleted here: their records may already be
       // linked to a saved log, and unlinked ones are tolerated orphans (deferred cleanup)

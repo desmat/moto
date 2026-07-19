@@ -176,3 +176,87 @@ export function computeMaintenanceStatus({ schedule, logs, vehicle, now, project
     items: (schedule.items || []).map((item) => computeItemStatus(item, logs || [], currentKm, now, projection)),
   };
 }
+
+// ---------------------------------------------------------------------------
+// S16/S17 severity ranking — one comparator so the dashboard card and the schedule
+// table sort identically. Pure and client-safe like everything else in this module.
+
+// one flattened, sortable entry: a MaintenanceItemStatus plus which vehicle it belongs
+// to and (when derivable) how many km away its due point is. `kmGap` is computed from
+// the vehicle's lastReading — display-grade context, mirroring how the engine's
+// authoritative math already ran against vehicle.mileage server-side.
+export type RankedMaintenanceItem = {
+  vehicleId: string;
+  status: MaintenanceItemStatus;
+  kmGap?: number; // nextDue.km - lastReading.mileage, when both are known
+};
+
+const STATUS_ORDER: Record<MaintenanceItemStatus["status"], number> = {
+  overdue: 0, upcoming: 1, ok: 2, unknown: 3,
+};
+
+// Normalized "how badly overdue" score, so a 500-km-overdue oil change can outrank a
+// 2-day-overdue inspection: max(overdueByKm / kmInterval, overdueByDays / 30). The km
+// axis normalizes by intervalKm, falling back to firstAtKm (never-done break-in items
+// carry their only km anchor there); with neither, only the days axis scores — and an
+// overdue item with no scorable axis at all ranks at 0 (still overdue, just last among
+// overdue).
+export function overdueSeverity(status: MaintenanceItemStatus): number {
+  const kmInterval = status.item.intervalKm ?? status.item.firstAtKm;
+  const kmAxis = status.overdueByKm != undefined && kmInterval
+    ? status.overdueByKm / kmInterval
+    : undefined;
+  const daysAxis = status.overdueByDays != undefined
+    ? status.overdueByDays / 30
+    : undefined;
+  return Math.max(kmAxis ?? 0, daysAxis ?? 0);
+}
+
+// THE comparator (stable, documented — S17 must sort with this exact function):
+// 1. status class: overdue < upcoming < ok < unknown;
+// 2. among overdue: overdueSeverity descending;
+// 3. then soonest nextDue.date ascending (dated entries before undated ones);
+// 4. then smallest kmGap ascending (known gaps before unknown ones);
+// 5. finally item key, then vehicleId, lexically — full determinism so equal-severity
+//    rows never swap between renders.
+export function compareRankedItems(a: RankedMaintenanceItem, b: RankedMaintenanceItem): number {
+  const statusDiff = STATUS_ORDER[a.status.status] - STATUS_ORDER[b.status.status];
+  if (statusDiff) return statusDiff;
+
+  if (a.status.status == "overdue") {
+    const severityDiff = overdueSeverity(b.status) - overdueSeverity(a.status);
+    if (severityDiff) return severityDiff;
+  }
+
+  const aDate = a.status.nextDue.date;
+  const bDate = b.status.nextDue.date;
+  if (aDate != bDate) {
+    if (aDate == undefined) return 1;
+    if (bDate == undefined) return -1;
+    const dateDiff = aDate.localeCompare(bDate);
+    if (dateDiff) return dateDiff;
+  }
+
+  if (a.kmGap != b.kmGap) {
+    if (a.kmGap == undefined) return 1;
+    if (b.kmGap == undefined) return -1;
+    return a.kmGap - b.kmGap;
+  }
+
+  return (a.status.item.key || "").localeCompare(b.status.item.key || "")
+    || a.vehicleId.localeCompare(b.vehicleId);
+}
+
+// Flatten every vehicle's items into one list sorted by compareRankedItems. Returns ALL
+// items (ok/unknown included, ranked last) — S16's card slices the due ones off the
+// front and reads the first "ok" entry for its "next up" line; S17 renders the lot.
+export function rankMaintenanceItems(vehicles: VehicleMaintenance[]): RankedMaintenanceItem[] {
+  return (vehicles || [])
+    .flatMap((vehicle) => (vehicle.items || []).map((status) => ({
+      vehicleId: vehicle.vehicleId,
+      status,
+      ...status.nextDue.km != undefined && vehicle.lastReading
+        && { kmGap: status.nextDue.km - vehicle.lastReading.mileage },
+    })))
+    .sort(compareRankedItems);
+}

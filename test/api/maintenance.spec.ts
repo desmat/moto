@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import moment from 'moment';
+import { rankMaintenanceItems } from '../../lib/maintenance';
 
 // S14: the maintenance status engine through its routes — GET
 // /api/vehicles/[id]/maintenance and GET /api/maintenance — under AI_MOCK + memory
@@ -595,6 +596,54 @@ test('projection: backdated lower service reading after a higher mileage log', a
   // target above the floor + slope <= 0 → no date at all
   const valves = itemFor(maintenance, 'valve-clearance');
   expect(valves.nextDue.date).toBeUndefined();
+
+  await cleanup(request, vehicle);
+});
+
+// ---------------------------------------------------------------------------
+// S16 severity ranking (lib/maintenance.ts's rankMaintenanceItems), asserted through
+// item order over a real route payload: the helper is client-safe library code with no
+// unit runner, so it's exercised here against /api/vehicles/[id]/maintenance output.
+
+test('ranking: overdue items order by normalized severity across km and day axes', async ({ request }) => {
+  // one service log 45 days ago at 10,000 km anchors three items; vehicle at 20,000 km.
+  // - chain      (intervalKm 1000):  due 11,000 → overdue 9,000 km → severity 9.0
+  // - air-filter (intervalMonths 1): due ~15 days ago → overdue ~15 d → severity ~0.5
+  // - engine-oil (intervalKm 8000):  due 18,000 → overdue 2,000 km → severity 0.25
+  // - spark-plugs (intervalMonths 2): due ~15 days out → upcoming (after all overdue)
+  // Normalization is the point: engine-oil is overdue by MORE km than air-filter is by
+  // days, but 2,000/8,000 < 15/30 — the fresher-relative-to-interval item ranks lower.
+  // Only one odometer observation exists → projection confidence "none" → no estimated
+  // dates can shift the fixture.
+  const vehicle = await createVehicle(request, 20000);
+  await confirmSchedule(request, vehicle.id, [
+    { key: 'engine-oil', name: 'Engine oil', action: 'replace', intervalKm: 8000 },
+    { key: 'chain', name: 'Drive chain', action: 'lubricate', intervalKm: 1000 },
+    { key: 'air-filter', name: 'Air filter', action: 'inspect', intervalMonths: 1 },
+    { key: 'spark-plugs', name: 'Spark plugs', action: 'inspect', intervalMonths: 2 },
+  ]);
+  await postLog(request, {
+    vehicleId: vehicle.id,
+    type: 'service',
+    date: daysAgo(45),
+    entry: 'Full service',
+    mileage: 10000,
+    items: [
+      { key: 'engine-oil', name: 'Engine oil', action: 'replace' },
+      { key: 'chain', name: 'Drive chain', action: 'lubricate' },
+      { key: 'air-filter', name: 'Air filter', action: 'inspect' },
+      { key: 'spark-plugs', name: 'Spark plugs', action: 'inspect' },
+    ],
+  });
+
+  const maintenance = await getMaintenance(request, vehicle.id);
+  const ranked = rankMaintenanceItems([maintenance]);
+
+  expect(ranked.map((entry) => entry.status.item.key))
+    .toEqual(['chain', 'air-filter', 'engine-oil', 'spark-plugs']);
+  expect(ranked.slice(0, 3).every((entry) => entry.status.status == 'overdue')).toBeTruthy();
+  expect(ranked[3].status.status).toBe('upcoming');
+  expect(ranked.every((entry) => entry.vehicleId == vehicle.id)).toBeTruthy();
 
   await cleanup(request, vehicle);
 });
