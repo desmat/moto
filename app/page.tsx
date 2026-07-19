@@ -109,11 +109,11 @@ export default function Page() {
       {(setupVehicles as any[]).map((vehicle: any) => (
         <div
           key={vehicle.id}
-          className="flex w-full max-w-[28rem] flex-row items-center gap-2 rounded-lg border border-input px-3 py-2"
+          className="relative flex w-full max-w-[28rem] flex-row items-center rounded-lg border border-input px-3 py-2"
         >
           <button
             type="button"
-            className="flex-1 text-center text-sm hover:underline"
+            className="w-full text-center text-sm hover:underline"
             onClick={() => setInterviewVehicle(vehicle)}
           >
             Finish setting up your {vehicleName(vehicle)} — 2 min
@@ -121,6 +121,7 @@ export default function Page() {
           <button
             type="button"
             aria-label={`Dismiss setup for ${vehicleName(vehicle)}`}
+            className="absolute right-3"
             onClick={() => dismissSetup(vehicle.id)}
           >
             <X className="h-4 w-4 opacity-60 hover:opacity-100" />
