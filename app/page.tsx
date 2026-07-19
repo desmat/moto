@@ -113,7 +113,7 @@ export default function Page() {
         >
           <button
             type="button"
-            className="flex-1 text-left text-sm hover:underline"
+            className="flex-1 text-center text-sm hover:underline"
             onClick={() => setInterviewVehicle(vehicle)}
           >
             Finish setting up your {vehicleName(vehicle)} — 2 min
